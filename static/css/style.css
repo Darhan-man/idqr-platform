@@ -1,0 +1,224 @@
+﻿@font-face {
+    font-family: 'Roboto Slab';
+    src: url('/static/fonts/RobotoSlab-Bold.ttf') format('truetype');
+    font-weight: bold;
+}
+
+/* Общие стили */
+body {
+    font-family: 'Roboto Slab', serif;
+    margin: 0;
+    padding: 0;
+    background: #f7f9fb;
+    color: #333;
+}
+
+.navbar {
+    background-color: #1a73e8;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.navbar h1 {
+    font-size: 20px;
+    margin: 0;
+}
+
+.navbar nav a {
+    margin-left: 20px;
+    text-decoration: none;
+    color: white;
+    font-weight: bold;
+    transition: opacity 0.3s ease;
+}
+
+.navbar nav a:hover {
+    opacity: 0.8;
+}
+
+.navbar nav .active {
+    text-decoration: underline;
+}
+
+/* Контейнер */
+.container {
+    padding: 30px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* Форма генерации */
+.qr-form {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.06);
+    margin-bottom: 30px;
+}
+
+.qr-form h2 {
+    margin-top: 0;
+    color: #1a73e8;
+}
+
+.qr-form input,
+.qr-form textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+.qr-form button {
+    padding: 10px 20px;
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.qr-form button:hover {
+    background-color: #155ab6;
+}
+
+/* Предпросмотр QR */
+.qr-preview {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.qr-preview img {
+    margin: 20px 0;
+    max-width: 300px;
+}
+
+.qr-preview h3 {
+    color: #c00;
+    font-size: 22px;
+}
+
+/* Список QR-кодов */
+.qr-list table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.04);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.qr-list th,
+.qr-list td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.qr-list th {
+    background: #f1f3f4;
+    color: #333;
+}
+
+.qr-list tr:hover {
+    background: #f9f9f9;
+}
+
+/* Кнопки действий */
+.btn-delete,
+.btn-download,
+.btn-share {
+    display: inline-block;
+    margin-right: 10px;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-delete {
+    background: #e53935;
+    color: white;
+    border: none;
+}
+
+.btn-delete:hover {
+    background: #c62828;
+}
+
+.btn-download {
+    background: #1e88e5;
+    color: white;
+    border: none;
+}
+
+.btn-download:hover {
+    background: #1565c0;
+}
+
+.btn-share {
+    background: #43a047;
+    color: white;
+    border: none;
+}
+
+.btn-share:hover {
+    background: #2e7d32;
+}
+
+/* Модули (кнопки) */
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 30px;
+}
+
+.module-button {
+    display: block;
+    background: linear-gradient(135deg, #1a73e8, #0f59c4);
+    color: white;
+    padding: 18px 15px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    text-decoration: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    transition: all 0.25s ease-in-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.module-button::after {
+    content: "→";
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.6;
+    transition: right 0.3s ease, opacity 0.3s ease;
+    font-size: 18px;
+}
+
+.module-button:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+    background: linear-gradient(135deg, #0f59c4, #1a73e8);
+}
+
+.module-button:hover::after {
+    right: 10px;
+    opacity: 1;
+}
