@@ -1,0 +1,2 @@
+# -idqr-platform
+IDQR
