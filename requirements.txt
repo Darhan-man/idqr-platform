@@ -1,6 +1,0 @@
-﻿fastapi
-uvicorn
-jinja2
-qrcode
-pillow
-aiosqlite
