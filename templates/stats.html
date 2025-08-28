@@ -19,6 +19,7 @@
 
     <div class="container">
         <h2>Аналитика QR-кодов</h2>
+        {% if stats_list %}
         <table>
             <thead>
                 <tr>
@@ -31,15 +32,17 @@
             <tbody>
                 {% for title, count, first_scan, last_scan in stats_list %}
                 <tr>
-                    <td>{{ title }}</td>
-                    <td>{{ count }}</td>
+                    <td>{{ title or '—' }}</td>
+                    <td>{{ count or 0 }}</td>
                     <td>{{ first_scan if first_scan else '—' }}</td>
                     <td>{{ last_scan if last_scan else '—' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+            <p>Статистика пока отсутствует.</p>
+        {% endif %}
     </div>
 </body>
 </html>
-
