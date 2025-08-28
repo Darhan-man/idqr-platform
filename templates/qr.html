@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -27,31 +27,35 @@
 
         {% if qr_url %}
             <div class="qr-preview">
+                <h3>Новый QR-код: {{ qr_title }}</h3>
                 <img src="{{ qr_url }}" alt="QR">
             </div>
         {% endif %}
 
         <div class="qr-list">
-            <h2>Список сгенерированных QR-кодов</h2>
+            <h2>Список QR-кодов</h2>
             {% if qr_list %}
                 <table>
                     <thead>
                         <tr>
                             <th>Название</th>
-                            <th>Дата</th>
-                            <th>Файл</th>
+                            <th>Дата создания</th>
+                            <th>Сканов</th>
+                            <th>QR</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for qr in qr_list %}
                         <tr>
-                            <td>{{ qr[1] }}</td>
-                            <td>{{ qr[4] }}</td>
-                            <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
+                            <td>{{ qr[1] }}</td> <!-- title -->
+                            <td>{{ qr[4] }}</td> <!-- created_at -->
+                            <td>{{ qr[5] }}</td> <!-- scan_count -->
+                            <td><img src="/static/qr/{{ qr[3] }}" width="100"></td> <!-- QR картинка -->
                             <td>
-                                <a href="/delete_qr/{{ qr[0] }}" class="btn-delete">Удалить</a>
-                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">Поделиться</a>
+                                <a href="/scan/{{ qr[0] }}" target="_blank">🔗 Сканировать</a>
+                                <a href="/delete_qr/{{ qr[0] }}" onclick="return confirm('Удалить QR-код?')">❌ Удалить</a>
+                                <a href="/static/qr/{{ qr[3] }}" download>💾 Скачать</a>
                             </td>
                         </tr>
                         {% endfor %}
