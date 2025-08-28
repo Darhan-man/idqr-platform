@@ -30,7 +30,8 @@ async def startup():
                 title TEXT,
                 data TEXT,
                 filename TEXT,
-                created_at TEXT
+                created_at TEXT,
+                scan_count INTEGER DEFAULT 0
             )
         """)
         # Сканирования
@@ -104,7 +105,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO qr_codes (title, data, filename, created_at, scan_count) VALUES (?, ?, ?, ?, 0)",
             (title, qrdata, filename, now)
         )
         await db.commit()
@@ -143,11 +144,15 @@ async def scan_qr(qr_id: int, request: Request):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     async with aiosqlite.connect(DB_PATH) as db:
+        # записываем факт сканирования
         await db.execute(
             "INSERT INTO scans (qr_id, ip, user_agent, timestamp) VALUES (?, ?, ?, ?)",
             (qr_id, ip, user_agent, now)
         )
+        # увеличиваем счётчик
+        await db.execute("UPDATE qr_codes SET scan_count = scan_count + 1 WHERE id = ?", (qr_id,))
         await db.commit()
+
         cursor = await db.execute("SELECT data FROM qr_codes WHERE id = ?", (qr_id,))
         row = await cursor.fetchone()
 
@@ -170,11 +175,11 @@ async def users(request: Request):
 async def stats(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("""
-            SELECT qr_codes.title, COUNT(scans.id), MIN(scans.timestamp), MAX(scans.timestamp)
+            SELECT qr_codes.title, qr_codes.scan_count, MIN(scans.timestamp), MAX(scans.timestamp)
             FROM qr_codes
             LEFT JOIN scans ON qr_codes.id = scans.qr_id
             GROUP BY qr_codes.id
-            ORDER BY COUNT(scans.id) DESC
+            ORDER BY qr_codes.scan_count DESC
         """)
         stats_list = await cursor.fetchall()
 
