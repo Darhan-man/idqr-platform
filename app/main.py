@@ -20,10 +20,10 @@ ADMIN_CODE = "1990"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
 
+# Инициализация БД
 @app.on_event("startup")
 async def startup():
     async with aiosqlite.connect(DB_PATH) as db:
-        # Таблица QR-кодов
         await db.execute("""
             CREATE TABLE IF NOT EXISTS qr_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +34,6 @@ async def startup():
                 scan_count INTEGER DEFAULT 0
             )
         """)
-        # Таблица сканов
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +72,7 @@ async def dashboard_qr(request: Request):
         "active": "qr"
     })
 
-# Генерация QR
+# Генерация QR-кода
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
@@ -93,13 +92,10 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     final_img = Image.new("RGB", (new_width, new_height), "white")
     draw = ImageDraw.Draw(final_img)
-
     text_x = (new_width - text_width) // 2
     draw.text((text_x, 10), title, font=font, fill="red")
-
     qr_x = (new_width - qr_img.width) // 2
     final_img.paste(qr_img, (qr_x, text_height + 20))
-
     final_img.save(filepath)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -134,4 +130,69 @@ async def delete_qr(qr_id: int):
                 os.remove(path)
             await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
             await db.commit()
-    return Red
+    return RedirectResponse(url="/dashboard/qr", status_code=303)
+
+# Сканирование QR
+@app.get("/scan/{qr_id}")
+async def scan_qr(qr_id: int, request: Request):
+    ip = request.client.host
+    user_agent = request.headers.get("user-agent")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO scans (qr_id, ip, user_agent, timestamp) VALUES (?, ?, ?, ?)",
+            (qr_id, ip, user_agent, now)
+        )
+        await db.execute("UPDATE qr_codes SET scan_count = scan_count + 1 WHERE id = ?", (qr_id,))
+        await db.commit()
+        cursor = await db.execute("SELECT data FROM qr_codes WHERE id = ?", (qr_id,))
+        row = await cursor.fetchone()
+
+    if row:
+        return RedirectResponse(url=row[0])
+    return RedirectResponse(url="/")
+
+# Статистика QR-кодов
+@app.get("/dashboard/stats", response_class=HTMLResponse)
+async def stats(request: Request):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            SELECT qr_codes.id, qr_codes.title, qr_codes.scan_count, MIN(scans.timestamp), MAX(scans.timestamp)
+            FROM qr_codes
+            LEFT JOIN scans ON qr_codes.id = scans.qr_id
+            GROUP BY qr_codes.id
+            ORDER BY qr_codes.scan_count DESC
+        """)
+        stats_list = await cursor.fetchall()
+
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "active": "stats",
+        "stats_list": stats_list
+    })
+
+# Дополнительные маршруты (модули, пользователи, настройки)
+@app.get("/dashboard/modules", response_class=HTMLResponse)
+async def modules(request: Request):
+    return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
+
+@app.get("/dashboard/users", response_class=HTMLResponse)
+async def users(request: Request):
+    return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
+
+@app.get("/dashboard/settings", response_class=HTMLResponse)
+async def settings(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
+
+@app.get("/dashboard/services", response_class=HTMLResponse)
+async def all_services(request: Request):
+    return templates.TemplateResponse("services.html", {"request": request})
+
+@app.get("/dashboard/business", response_class=HTMLResponse)
+async def business_module(request: Request):
+    return templates.TemplateResponse("business.html", {"request": request})
+
+@app.get("/dashboard/cleaning", response_class=HTMLResponse)
+async def cleaning_services(request: Request):
+    return templates.TemplateResponse("cleaning.html", {"request": request})
