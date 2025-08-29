@@ -1,40 +1,25 @@
-<div class="container">
-    <h2>Аналитика QR-кодов</h2>
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Статистика</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <h1>IDQR: Статистика</h1>
+        <nav>
+            <a href="/dashboard/qr">📦 QR-Коды</a>
+            <a href="/dashboard/modules">🧩 Модули</a>
+            <a href="/dashboard/users">👤 Пользователи</a>
+            <a href="/dashboard/stats" class="active">📊 Статистика</a>
+            <a href="/dashboard/settings">⚙️ Настройки</a>
+        </nav>
+    </div>
 
-    <table border="1" cellpadding="10">
-        <tr>
-            <th>Название</th>
-            <th>Кол-во сканирований</th>
-            <th>Первое сканирование</th>
-            <th>Последнее сканирование</th>
-        </tr>
-        {% for row in stats_list %}
-        <tr>
-            <td>{{ row[0] }}</td>
-            <td>{{ row[1] }}</td>
-            <td>{{ row[2] if row[2] else "-" }}</td>
-            <td>{{ row[3] if row[3] else "-" }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-    <canvas id="scanChart" width="600" height="300"></canvas>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    const ctx = document.getElementById('scanChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: {{ stats_list | map(attribute=0) | list | safe }},
-            datasets: [{
-                label: 'Сканирования',
-                data: {{ stats_list | map(attribute=1) | list | safe }},
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        }
-    });
-</script>
+    <div class="container">
+        <h2>Аналитика и отчёты</h2>
+        <p>📈 Здесь будут графики, количество QR-кодов, статистика по модулям и экспорт данных.</p>
+    </div>
+</body>
+</html> вот что у меня в stats
