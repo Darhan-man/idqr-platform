@@ -23,7 +23,6 @@ os.makedirs(QR_FOLDER, exist_ok=True)
 @app.on_event("startup")
 async def startup():
     async with aiosqlite.connect(DB_PATH) as db:
-        # QR-коды
         await db.execute("""
             CREATE TABLE IF NOT EXISTS qr_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +33,6 @@ async def startup():
                 scan_count INTEGER DEFAULT 0
             )
         """)
-        # Сканирования
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +45,7 @@ async def startup():
         """)
         await db.commit()
 
-# Главная (вход)
+# Главная
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -93,13 +91,10 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     final_img = Image.new("RGB", (new_width, new_height), "white")
     draw = ImageDraw.Draw(final_img)
-
     text_x = (new_width - text_width) // 2
     draw.text((text_x, 10), title, font=font, fill="red")
-
     qr_x = (new_width - qr_img.width) // 2
     final_img.paste(qr_img, (qr_x, text_height + 20))
-
     final_img.save(filepath)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -128,49 +123,43 @@ async def delete_qr(qr_id: int):
         cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
         row = await cursor.fetchone()
         if row:
-            filename = row[0]
-            path = os.path.join(QR_FOLDER, filename)
+            path = os.path.join(QR_FOLDER, row[0])
             if os.path.exists(path):
                 os.remove(path)
             await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
             await db.commit()
     return RedirectResponse(url="/dashboard/qr", status_code=303)
 
-# 🚀 Новый маршрут: сканирование QR
+# Сканирование QR
 @app.get("/scan/{qr_id}")
 async def scan_qr(qr_id: int, request: Request):
     ip = request.client.host
-    user_agent = request.headers.get("user-agent")
+    ua = request.headers.get("user-agent")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     async with aiosqlite.connect(DB_PATH) as db:
-        # записываем факт сканирования
         await db.execute(
             "INSERT INTO scans (qr_id, ip, user_agent, timestamp) VALUES (?, ?, ?, ?)",
-            (qr_id, ip, user_agent, now)
+            (qr_id, ip, ua, now)
         )
-        # увеличиваем счётчик
         await db.execute("UPDATE qr_codes SET scan_count = scan_count + 1 WHERE id = ?", (qr_id,))
         await db.commit()
-
         cursor = await db.execute("SELECT data FROM qr_codes WHERE id = ?", (qr_id,))
         row = await cursor.fetchone()
 
-    if row:
-        return RedirectResponse(url=row[0])  # редирект на сохранённый url
-    return RedirectResponse(url="/")
+    return RedirectResponse(url=row[0]) if row else RedirectResponse(url="/")
 
-# 🧩 Модули
+# Модули
 @app.get("/dashboard/modules", response_class=HTMLResponse)
 async def modules(request: Request):
     return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
 
-# 👤 Пользователи
+# Пользователи
 @app.get("/dashboard/users", response_class=HTMLResponse)
 async def users(request: Request):
     return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
 
-# 📊 Статистика
+# 📊 Статистика (исправлено)
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -181,7 +170,18 @@ async def stats(request: Request):
             GROUP BY qr_codes.id
             ORDER BY qr_codes.scan_count DESC
         """)
-        stats_list = await cursor.fetchall()
+        rows = await cursor.fetchall()
+
+    stats_list = []
+    for row in rows:
+        qr_id, title, count, first_scan, last_scan = row
+        stats_list.append({
+            "id": qr_id,
+            "title": title or "—",
+            "count": count or 0,
+            "first_scan": first_scan if first_scan else "—",
+            "last_scan": last_scan if last_scan else "—"
+        })
 
     return templates.TemplateResponse("stats.html", {
         "request": request,
@@ -189,13 +189,12 @@ async def stats(request: Request):
         "stats_list": stats_list
     })
 
-
-# ⚙️ Настройки
+# Настройки
 @app.get("/dashboard/settings", response_class=HTMLResponse)
 async def settings(request: Request):
     return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
 
-# 🧾 ВСЕ УСЛУГИ
+# Прочие сервисы
 @app.get("/dashboard/services", response_class=HTMLResponse)
 async def all_services(request: Request):
     return templates.TemplateResponse("services.html", {"request": request})
@@ -204,7 +203,6 @@ async def all_services(request: Request):
 async def business_module(request: Request):
     return templates.TemplateResponse("business.html", {"request": request})
 
-# Уборка и гигиена
 @app.get("/dashboard/cleaning", response_class=HTMLResponse)
 async def cleaning_services(request: Request):
     return templates.TemplateResponse("cleaning.html", {"request": request})
