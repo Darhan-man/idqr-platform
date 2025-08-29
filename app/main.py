@@ -100,10 +100,12 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     draw = ImageDraw.Draw(final_img)
 
     # Текст сверху
-    text_x = (new_width - text_width) // 2 draw.text((text_x, 10), title, font=font, fill="red") 
+    text_x = (new_width - text_width) // 2 
+    draw.text((text_x, 10), title, font=font, fill="red") 
     
     # QR-код снизу
-    qr_x = (new_width - qr_img.width) // 2 final_img.paste(qr_img, (qr_x, text_height + 20))
+    qr_x = (new_width - qr_img.width) // 2 
+    final_img.paste(qr_img, (qr_x, text_height + 20))
     
     final_img.save(filepath)
 
