@@ -13,9 +13,10 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-QR_FOLDER = "static/qr"
+# На Render лучше использовать /tmp для файлов
+QR_FOLDER = "/tmp/qr"
+DB_PATH = "/tmp/qr_data.db"
 FONT_PATH = "fonts/RobotoSlab-Bold.ttf"
-DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
@@ -46,7 +47,7 @@ async def startup():
         """)
         await db.commit()
 
-# Главная страница
+# Главная
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -58,7 +59,7 @@ async def login(request: Request, code: str = Form(...)):
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
-# Панель QR-кодов
+# Панель QR
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -72,7 +73,7 @@ async def dashboard_qr(request: Request):
         "active": "qr"
     })
 
-# Генерация QR-кода
+# Генерация QR
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
@@ -135,7 +136,7 @@ async def delete_qr(qr_id: int):
 # Сканирование QR
 @app.get("/scan/{qr_id}")
 async def scan_qr(qr_id: int, request: Request):
-    ip = request.client.host
+    ip = request.headers.get("x-forwarded-for", request.client.host)
     user_agent = request.headers.get("user-agent")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -149,11 +150,11 @@ async def scan_qr(qr_id: int, request: Request):
         cursor = await db.execute("SELECT data FROM qr_codes WHERE id = ?", (qr_id,))
         row = await cursor.fetchone()
 
-    if row:
+    if row and row[0].startswith("http"):
         return RedirectResponse(url=row[0])
     return RedirectResponse(url="/")
 
-# Статистика QR-кодов
+# Статистика QR
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -171,28 +172,3 @@ async def stats(request: Request):
         "active": "stats",
         "stats_list": stats_list
     })
-
-# Дополнительные маршруты (модули, пользователи, настройки)
-@app.get("/dashboard/modules", response_class=HTMLResponse)
-async def modules(request: Request):
-    return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
-
-@app.get("/dashboard/users", response_class=HTMLResponse)
-async def users(request: Request):
-    return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
-
-@app.get("/dashboard/settings", response_class=HTMLResponse)
-async def settings(request: Request):
-    return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
-
-@app.get("/dashboard/services", response_class=HTMLResponse)
-async def all_services(request: Request):
-    return templates.TemplateResponse("services.html", {"request": request})
-
-@app.get("/dashboard/business", response_class=HTMLResponse)
-async def business_module(request: Request):
-    return templates.TemplateResponse("business.html", {"request": request})
-
-@app.get("/dashboard/cleaning", response_class=HTMLResponse)
-async def cleaning_services(request: Request):
-    return templates.TemplateResponse("cleaning.html", {"request": request})
