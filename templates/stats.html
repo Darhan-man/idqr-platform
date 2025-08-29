@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Статистика QR</title>
+    <title>Статистика</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -20,12 +20,13 @@
     <div class="container">
         <h2>📊 Аналитика QR-кодов</h2>
 
-        <table class="stats-table" border="1" cellpadding="8" cellspacing="0" width="100%">
+        {% if stats_list %}
+        <table border="1" cellpadding="8" cellspacing="0" width="100%">
             <tr>
                 <th>ID</th>
                 <th>Название</th>
-                <th>Оригинальная ссылка</th>
-                <th>Количество сканов</th>
+                <th>Ссылка</th>
+                <th>Сканов</th>
                 <th>Последний скан</th>
             </tr>
             {% for qr in stats_list %}
@@ -38,6 +39,9 @@
             </tr>
             {% endfor %}
         </table>
+        {% else %}
+        <p>Пока нет данных для статистики.</p>
+        {% endif %}
     </div>
 </body>
 </html>
