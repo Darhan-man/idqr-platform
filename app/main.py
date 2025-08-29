@@ -95,7 +95,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     temp_img = Image.new("RGB", (1, 1))
     draw_temp = ImageDraw.Draw(temp_img)
 
-    # получаем размер текста
+    # измеряем размер текста
     bbox = draw_temp.textbbox((0, 0), title, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
@@ -130,7 +130,6 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         "qr_list": qr_list,
         "active": "qr"
     })
-
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
