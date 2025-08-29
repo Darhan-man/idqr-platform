@@ -4,33 +4,6 @@
     <meta charset="UTF-8">
     <title>Статистика</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <style>
-        .btn {
-            display: inline-block;
-            margin-bottom: 15px;
-            padding: 8px 15px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        tbody tr:nth-child(even){background-color: #f9f9f9;}
-        tbody tr:hover {background-color: #e0f7fa;}
-    </style>
 </head>
 <body>
     <div class="navbar">
@@ -46,8 +19,6 @@
 
     <div class="container">
         <h2>Аналитика QR-кодов</h2>
-        <a href="/dashboard/qr" class="btn">← Назад к QR-кодам</a>
-
         {% if stats_list %}
         <table>
             <thead>
@@ -59,11 +30,9 @@
                 </tr>
             </thead>
             <tbody>
-                {% for qr_id, title, count, first_scan, last_scan in stats_list %}
+                {% for id, title, count, first_scan, last_scan in stats_list %}
                 <tr>
-                    <td>
-                        <a href="/dashboard/scans/{{ qr_id }}">{{ title or '—' }}</a>
-                    </td>
+                    <td>{{ title or '—' }}</td>
                     <td>{{ count or 0 }}</td>
                     <td>{{ first_scan if first_scan else '—' }}</td>
                     <td>{{ last_scan if last_scan else '—' }}</td>
