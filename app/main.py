@@ -20,6 +20,7 @@ ADMIN_CODE = "1990"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
 
+# 📌 Инициализация БД с учётом статистики
 @app.on_event("startup")
 async def startup():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -29,7 +30,9 @@ async def startup():
                 title TEXT,
                 data TEXT,
                 filename TEXT,
-                created_at TEXT
+                created_at TEXT,
+                scan_count INTEGER DEFAULT 0,
+                last_scan TEXT
             )
         """)
         await db.commit()
@@ -60,13 +63,27 @@ async def dashboard_qr(request: Request):
         "active": "qr"
     })
 
-# Генерация QR
+# 📌 Генерация QR (на /scan/{id})
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
-    qr_img = qrcode.make(qrdata).convert("RGB")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
+            (title, qrdata, filename, now)
+        )
+        await db.commit()
+        qr_id = cursor.lastrowid
+        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+        qr_list = await cursor.fetchall()
+
+    # 🔗 QR ведет на наш эндпоинт /scan/{id}
+    scan_url = f"/scan/{qr_id}"
+
+    qr_img = qrcode.make(scan_url).convert("RGB")
 
     try:
         font = ImageFont.truetype(FONT_PATH, 32)
@@ -89,16 +106,6 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     final_img.save(filepath)
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
-            (title, qrdata, filename, now)
-        )
-        await db.commit()
-        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-        qr_list = await cursor.fetchall()
-
     qr_url = f"/static/qr/{filename}"
     return templates.TemplateResponse("qr.html", {
         "request": request,
@@ -107,6 +114,24 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         "qr_list": qr_list,
         "active": "qr"
     })
+
+# 📌 Сканирование QR (увеличиваем счетчик и редиректим)
+@app.get("/scan/{qr_id}")
+async def scan_qr(qr_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT data FROM qr_codes WHERE id = ?", (qr_id,))
+        row = await cursor.fetchone()
+        if row:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            await db.execute("""
+                UPDATE qr_codes
+                SET scan_count = scan_count + 1,
+                    last_scan = ?
+                WHERE id = ?
+            """, (now, qr_id))
+            await db.commit()
+            return RedirectResponse(row[0])  # редиректим на оригинальную ссылку
+    return {"error": "QR not found"}
 
 # Удаление QR
 @app.get("/delete_qr/{qr_id}")
@@ -136,7 +161,18 @@ async def users(request: Request):
 # 📊 Статистика
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
-    return templates.TemplateResponse("stats.html", {"request": request, "active": "stats"})
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            SELECT id, title, data, filename, scan_count, last_scan
+            FROM qr_codes
+            ORDER BY id DESC
+        """)
+        stats_list = await cursor.fetchall()
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "active": "stats",
+        "stats_list": stats_list
+    })
 
 # ⚙️ Настройки
 @app.get("/dashboard/settings", response_class=HTMLResponse)
