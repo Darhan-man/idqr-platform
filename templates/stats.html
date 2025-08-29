@@ -1,9 +1,8 @@
-
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Статистика</title>
+    <title>Статистика QR</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -19,8 +18,26 @@
     </div>
 
     <div class="container">
-        <h2>Аналитика и отчёты</h2>
-        <p>📈 Здесь будут графики, количество QR-кодов, статистика по модулям и экспорт данных.</p>
+        <h2>📊 Аналитика QR-кодов</h2>
+
+        <table class="stats-table" border="1" cellpadding="8" cellspacing="0" width="100%">
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Оригинальная ссылка</th>
+                <th>Количество сканов</th>
+                <th>Последний скан</th>
+            </tr>
+            {% for qr in stats_list %}
+            <tr>
+                <td>{{ qr[0] }}</td>
+                <td>{{ qr[1] }}</td>
+                <td><a href="{{ qr[2] }}" target="_blank">{{ qr[2] }}</a></td>
+                <td><b>{{ qr[4] }}</b></td>
+                <td>{{ qr[5] if qr[5] else "—" }}</td>
+            </tr>
+            {% endfor %}
+        </table>
     </div>
 </body>
 </html>
