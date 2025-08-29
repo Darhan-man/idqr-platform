@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <title>Панель QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f9f9f9; }
+        .navbar { background: #333; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; }
+        .navbar h1 { margin: 0; font-size: 20px; }
+        .navbar nav a { color: white; margin-left: 15px; text-decoration: none; }
+        .navbar nav a.active { font-weight: bold; text-decoration: underline; }
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .qr-form input, .qr-form textarea { width: 100%; padding: 10px; margin: 5px 0; }
+        .qr-form button { padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        .qr-form button:hover { background: #45a049; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+        th { background: #f4f4f4; }
+        .qr-preview { margin-top: 20px; text-align: center; }
+        .qr-preview img { margin-top: 10px; width: 150px; height: 150px; }
+        .qr-list a { margin: 0 5px; text-decoration: none; }
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -20,9 +37,9 @@
     <div class="container">
         <form method="post" action="/generate_qr" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
-            <input type="text" name="title" placeholder="Название" required>
-            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
-            <button type="submit">Генерировать</button>
+            <input type="text" name="title" placeholder="Название QR-кода" required>
+            <textarea name="qrdata" placeholder="Данные для кодирования (ссылка или текст)" required></textarea>
+            <button type="submit">Генерировать QR</button>
         </form>
 
         {% if qr_url %}
@@ -48,10 +65,10 @@
                     <tbody>
                         {% for qr in qr_list %}
                         <tr>
-                            <td>{{ qr[1] }}</td> <!-- title -->
-                            <td>{{ qr[4] }}</td> <!-- created_at -->
-                            <td>{{ qr[5] }}</td> <!-- scan_count -->
-                            <td><img src="/static/qr/{{ qr[3] }}" width="100"></td> <!-- QR картинка -->
+                            <td>{{ qr[1] }}</td>
+                            <td>{{ qr[4] }}</td>
+                            <td>{{ qr[5] }}</td>
+                            <td><img src="/static/qr/{{ qr[3] }}" width="100"></td>
                             <td>
                                 <a href="/scan/{{ qr[0] }}" target="_blank">🔗 Сканировать</a>
                                 <a href="/delete_qr/{{ qr[0] }}" onclick="return confirm('Удалить QR-код?')">❌ Удалить</a>
