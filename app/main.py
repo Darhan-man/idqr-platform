@@ -20,7 +20,6 @@ ADMIN_CODE = "1990"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# Инициализация базы
 @app.on_event("startup")
 async def startup():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -58,7 +57,7 @@ async def login(request: Request, code: str = Form(...)):
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
-# Панель QR
+# Панель QR-кодов
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -149,3 +148,61 @@ async def scan_qr(qr_id: int, request: Request):
         row = await cursor.fetchone()
 
     return RedirectResponse(url=row[0]) if row else RedirectResponse(url="/")
+
+# Модули
+@app.get("/dashboard/modules", response_class=HTMLResponse)
+async def modules(request: Request):
+    return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
+
+# Пользователи
+@app.get("/dashboard/users", response_class=HTMLResponse)
+async def users(request: Request):
+    return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
+
+# 📊 Статистика (исправлено)
+@app.get("/dashboard/stats", response_class=HTMLResponse)
+async def stats(request: Request):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            SELECT qr_codes.id, qr_codes.title, qr_codes.scan_count, MIN(scans.timestamp), MAX(scans.timestamp)
+            FROM qr_codes
+            LEFT JOIN scans ON qr_codes.id = scans.qr_id
+            GROUP BY qr_codes.id
+            ORDER BY qr_codes.scan_count DESC
+        """)
+        rows = await cursor.fetchall()
+
+    stats_list = []
+    for row in rows:
+        qr_id, title, count, first_scan, last_scan = row
+        stats_list.append({
+            "id": qr_id,
+            "title": title or "—",
+            "count": count or 0,
+            "first_scan": first_scan if first_scan else "—",
+            "last_scan": last_scan if last_scan else "—"
+        })
+
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "active": "stats",
+        "stats_list": stats_list
+    })
+
+# Настройки
+@app.get("/dashboard/settings", response_class=HTMLResponse)
+async def settings(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
+
+# Прочие сервисы
+@app.get("/dashboard/services", response_class=HTMLResponse)
+async def all_services(request: Request):
+    return templates.TemplateResponse("services.html", {"request": request})
+
+@app.get("/dashboard/business", response_class=HTMLResponse)
+async def business_module(request: Request):
+    return templates.TemplateResponse("business.html", {"request": request})
+
+@app.get("/dashboard/cleaning", response_class=HTMLResponse)
+async def cleaning_services(request: Request):
+    return templates.TemplateResponse("cleaning.html", {"request": request})
