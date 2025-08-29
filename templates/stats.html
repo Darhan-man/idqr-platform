@@ -43,13 +43,13 @@
                 </tr>
             </thead>
             <tbody>
-                {% for id, title, count, first_scan, last_scan in stats_list %}
+                {% for stat in stats_list %}
                 <tr>
-                    <td>{{ id }}</td>
-                    <td>{{ title or '—' }}</td>
-                    <td>{{ count or 0 }}</td>
-                    <td>{{ first_scan if first_scan else '—' }}</td>
-                    <td>{{ last_scan if last_scan else '—' }}</td>
+                    <td>{{ stat.id }}</td>
+                    <td>{{ stat.title }}</td>
+                    <td>{{ stat.count }}</td>
+                    <td>{{ stat.first_scan }}</td>
+                    <td>{{ stat.last_scan }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
