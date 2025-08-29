@@ -175,7 +175,7 @@ async def users(request: Request):
 async def stats(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("""
-            SELECT qr_codes.title, qr_codes.scan_count, MIN(scans.timestamp), MAX(scans.timestamp)
+            SELECT qr_codes.id, qr_codes.title, qr_codes.scan_count, MIN(scans.timestamp), MAX(scans.timestamp)
             FROM qr_codes
             LEFT JOIN scans ON qr_codes.id = scans.qr_id
             GROUP BY qr_codes.id
@@ -188,6 +188,7 @@ async def stats(request: Request):
         "active": "stats",
         "stats_list": stats_list
     })
+
 
 # ⚙️ Настройки
 @app.get("/dashboard/settings", response_class=HTMLResponse)
