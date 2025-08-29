@@ -81,19 +81,26 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         await db.commit()
         qr_id = cursor.lastrowid
 
+    # Полный URL для сканирования
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
     # --- Добавляем текст над QR ---
     try:
-        font = ImageFont.truetype(FONT_PATH, 32)  # убедись, что шрифт поддерживает кириллицу
+        font = ImageFont.truetype(FONT_PATH, 32)  # шрифт с поддержкой кириллицы
     except IOError:
         font = ImageFont.load_default()
 
-    # измеряем текст
-    text_width, text_height = font.getsize(title)
+    # создаем временный объект для измерения текста
+    temp_img = Image.new("RGB", (1, 1))
+    draw_temp = ImageDraw.Draw(temp_img)
 
-    # создаем новый холст: сверху для текста, снизу QR
+    # получаем размер текста
+    bbox = draw_temp.textbbox((0, 0), title, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+
+    # создаем новый холст: сверху текст, снизу QR
     new_width = max(qr_img.width, text_width + 20)
     new_height = qr_img.height + text_height + 20
     final_img = Image.new("RGB", (new_width, new_height), "white")
