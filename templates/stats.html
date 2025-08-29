@@ -4,23 +4,11 @@
     <meta charset="UTF-8">
     <title>Статистика QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f9f9f9; }
-        .navbar { background: #333; color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; }
-        .navbar h1 { margin: 0; font-size: 20px; }
-        .navbar nav a { color: white; margin-left: 15px; text-decoration: none; }
-        .navbar nav a.active { font-weight: bold; text-decoration: underline; }
-        .container { max-width: 900px; margin: 20px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
-        th { background: #f4f4f4; }
-        tr:hover { background: #f1f1f1; }
-        h2 { margin-top: 0; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="navbar">
-        <h1>IDQR: Статистика</h1>
+        <h1>IDQR: Статистика QR-Кодов</h1>
         <nav>
             <a href="/dashboard/qr" class="{{ 'active' if active == 'qr' else '' }}">📦 QR-Коды</a>
             <a href="/dashboard/modules" class="{{ 'active' if active == 'modules' else '' }}">🧩 Модули</a>
@@ -34,28 +22,55 @@
         <h2>Статистика сканирования QR-кодов</h2>
 
         {% if stats_list %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Название</th>
-                        <th>Количество сканов</th>
-                        <th>Дата первого скана</th>
-                        <th>Дата последнего скана</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for stat in stats_list %}
-                    <tr>
-                        <td>{{ stat.title }}</td>
-                        <td>{{ stat.count }}</td>
-                        <td>{{ stat.first_scan }}</td>
-                        <td>{{ stat.last_scan }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <table>
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Сканов</th>
+                    <th>Первое сканирование</th>
+                    <th>Последнее сканирование</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stat in stats_list %}
+                <tr>
+                    <td>{{ stat.title }}</td>
+                    <td>{{ stat.count }}</td>
+                    <td>{{ stat.first_scan }}</td>
+                    <td>{{ stat.last_scan }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>График сканов</h3>
+        <canvas id="qrChart" width="800" height="400"></canvas>
+        <script>
+            const ctx = document.getElementById('qrChart').getContext('2d');
+            const labels = [{% for stat in stats_list %}'{{ stat.title }}',{% endfor %}];
+            const data = [{% for stat in stats_list %}{{ stat.count }},{% endfor %}];
+            const qrChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Количество сканов',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, stepSize: 1 }
+                    }
+                }
+            });
+        </script>
+
         {% else %}
-            <p>Статистика пока отсутствует.</p>
+        <p>Пока нет данных по сканированию.</p>
         {% endif %}
     </div>
 </body>
