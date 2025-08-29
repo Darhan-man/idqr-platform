@@ -4,73 +4,44 @@
     <meta charset="UTF-8">
     <title>Статистика QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="navbar">
-        <h1>IDQR: Статистика QR-Кодов</h1>
+        <h1>IDQR: Статистика</h1>
         <nav>
-            <a href="/dashboard/qr" class="{{ 'active' if active == 'qr' else '' }}">📦 QR-Коды</a>
-            <a href="/dashboard/modules" class="{{ 'active' if active == 'modules' else '' }}">🧩 Модули</a>
-            <a href="/dashboard/users" class="{{ 'active' if active == 'users' else '' }}">👤 Пользователи</a>
+            <a href="/dashboard/qr">📦 QR-Коды</a>
+            <a href="/dashboard/modules">🧩 Модули</a>
+            <a href="/dashboard/users">👤 Пользователи</a>
             <a href="/dashboard/stats" class="{{ 'active' if active == 'stats' else '' }}">📊 Статистика</a>
-            <a href="/dashboard/settings" class="{{ 'active' if active == 'settings' else '' }}">⚙️ Настройки</a>
+            <a href="/dashboard/settings">⚙️ Настройки</a>
         </nav>
     </div>
 
     <div class="container">
-        <h2>Статистика сканирования QR-кодов</h2>
-
+        <h2>Статистика QR-кодов</h2>
         {% if stats_list %}
         <table>
             <thead>
                 <tr>
                     <th>Название</th>
-                    <th>Сканов</th>
-                    <th>Первое сканирование</th>
-                    <th>Последнее сканирование</th>
+                    <th>Количество сканов</th>
+                    <th>Первый скан</th>
+                    <th>Последний скан</th>
                 </tr>
             </thead>
             <tbody>
-                {% for stat in stats_list %}
+                {% for qr in stats_list %}
                 <tr>
-                    <td>{{ stat.title }}</td>
-                    <td>{{ stat.count }}</td>
-                    <td>{{ stat.first_scan }}</td>
-                    <td>{{ stat.last_scan }}</td>
+                    <td>{{ qr.title }}</td>
+                    <td>{{ qr.count }}</td>
+                    <td>{{ qr.first_scan }}</td>
+                    <td>{{ qr.last_scan }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-
-        <h3>График сканов</h3>
-        <canvas id="qrChart" width="800" height="400"></canvas>
-        <script>
-            const ctx = document.getElementById('qrChart').getContext('2d');
-            const labels = [{% for stat in stats_list %}'{{ stat.title }}',{% endfor %}];
-            const data = [{% for stat in stats_list %}{{ stat.count }},{% endfor %}];
-            const qrChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Количество сканов',
-                        data: data,
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: { beginAtZero: true, stepSize: 1 }
-                    }
-                }
-            });
-        </script>
-
         {% else %}
-        <p>Пока нет данных по сканированию.</p>
+        <p>Нет данных для отображения.</p>
         {% endif %}
     </div>
 </body>
