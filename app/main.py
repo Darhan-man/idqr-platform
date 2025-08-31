@@ -66,6 +66,9 @@ async def dashboard_qr(request: Request):
     })
 
 # --- Генерация QR ---
+@app.get("/generate_qr")
+async def generate_qr_redirect():
+    return RedirectResponse(url="/dashboard/qr")
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
