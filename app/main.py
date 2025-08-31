@@ -70,7 +70,12 @@ async def generate_qr_redirect():
     return RedirectResponse(url="/dashboard/qr")
 
 @app.post("/generate_qr", response_class=HTMLResponse)
-async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
+async def generate_qr(
+    request: Request,
+    qrdata: str = Form(...),
+    title: str = Form(...),
+    text_y: int = Form(10)  # получаем Y-позицию текста
+):
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
@@ -88,11 +93,10 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
-    # --- Параметры текста (можно менять) ---
+    # --- Параметры текста ---
     FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
     FONT_SIZE = 32
     TEXT_COLOR = "red"
-    TOP_MARGIN = 10
     BETWEEN_MARGIN = 15
     MIN_WIDTH = 150
     MIN_HEIGHT = 150
@@ -111,7 +115,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Размер холста ---
     new_width = max(qr_img.width, text_width, MIN_WIDTH) + 20
-    new_height = TOP_MARGIN + text_height + BETWEEN_MARGIN + qr_img.height + TOP_MARGIN
+    new_height = text_y + text_height + BETWEEN_MARGIN + qr_img.height + 10
     if new_height < MIN_HEIGHT:
         new_height = MIN_HEIGHT
 
@@ -121,12 +125,11 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Рисуем текст ---
     text_x = (new_width - text_width) // 2
-    text_y = TOP_MARGIN
     draw.text((text_x, text_y), title, font=font, fill=TEXT_COLOR)
 
     # --- Вставляем QR ---
     qr_x = (new_width - qr_img.width) // 2
-    qr_y = TOP_MARGIN + text_height + BETWEEN_MARGIN
+    qr_y = text_y + text_height + BETWEEN_MARGIN
     final_img.paste(qr_img, (qr_x, qr_y))
 
     # --- Сохраняем изображение ---
@@ -145,6 +148,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         "qr_list": qr_list,
         "active": "qr"
     })
+
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
