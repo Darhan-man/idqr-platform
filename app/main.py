@@ -92,9 +92,10 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         font = ImageFont.load_default()
 
     # измеряем текст
-    text_bbox = font.getbbox(title)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
+    draw_temp = ImageDraw.Draw(qr_img)
+    bbox = draw_temp.textbbox((0, 0), title, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
 
     # создаем новый холст: сверху текст, снизу QR
     new_width = max(qr_img.width, text_width + 20)
