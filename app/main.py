@@ -69,6 +69,7 @@ async def dashboard_qr(request: Request):
 @app.get("/generate_qr")
 async def generate_qr_redirect():
     return RedirectResponse(url="/dashboard/qr")
+
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
@@ -84,16 +85,15 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         await db.commit()
         qr_id = cursor.lastrowid
 
-    # --- Генерируем ссылку для сканирования ---
+    # Генерируем ссылку для сканирования
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
     # --- Добавляем текст над QR ---
+    FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
     try:
-        # Используем TTF-шрифт с поддержкой кириллицы
-        font = ImageFont.truetype(FONT_PATH, 32)  # FONT_PATH = "fonts/RobotoSlab-Bold.ttf"
+        font = ImageFont.truetype(FONT_PATH, 32)  # жирный шрифт с поддержкой кириллицы
     except IOError:
-        # Если шрифт не найден, используем стандартный
         font = ImageFont.load_default()
 
     # измеряем текст
@@ -119,7 +119,6 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     # сохраняем финальное изображение
     final_img.save(filepath)
     qr_url = f"/static/qr/{filename}"
-
 
     # --- обновляем список QR ---
     async with aiosqlite.connect(DB_PATH) as db:
