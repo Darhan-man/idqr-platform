@@ -64,7 +64,6 @@ async def dashboard_qr(request: Request):
         "qr_title": None,
         "active": "qr"
     })
-
 # --- Генерация QR ---
 @app.get("/generate_qr")
 async def generate_qr_redirect():
@@ -75,7 +74,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
-    # Сохраняем запись в БД
+    # --- Сохраняем запись в БД ---
     async with aiosqlite.connect(DB_PATH) as db:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = await db.execute(
@@ -85,42 +84,56 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         await db.commit()
         qr_id = cursor.lastrowid
 
-    # Генерируем ссылку для сканирования
+    # --- Генерация QR ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
-    # --- Добавляем текст над QR ---
+    # --- Параметры текста (можно менять) ---
     FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
+    FONT_SIZE = 32
+    TEXT_COLOR = "red"
+    TOP_MARGIN = 10
+    BETWEEN_MARGIN = 15
+    MIN_WIDTH = 150
+    MIN_HEIGHT = 150
+
+    # --- Шрифт ---
     try:
-        font = ImageFont.truetype(FONT_PATH, 32)  # жирный шрифт с поддержкой кириллицы
+        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
     except IOError:
         font = ImageFont.load_default()
 
-    # измеряем текст
+    # --- Измеряем текст ---
     draw_temp = ImageDraw.Draw(qr_img)
     bbox = draw_temp.textbbox((0, 0), title, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    # создаем новый холст: сверху текст, снизу QR
-    new_width = max(qr_img.width, text_width + 20)
-    new_height = qr_img.height + text_height + 20
+    # --- Размер холста ---
+    new_width = max(qr_img.width, text_width, MIN_WIDTH) + 20
+    new_height = TOP_MARGIN + text_height + BETWEEN_MARGIN + qr_img.height + TOP_MARGIN
+    if new_height < MIN_HEIGHT:
+        new_height = MIN_HEIGHT
+
+    # --- Создаем холст ---
     final_img = Image.new("RGB", (new_width, new_height), "white")
     draw = ImageDraw.Draw(final_img)
 
-    # рисуем текст сверху
+    # --- Рисуем текст ---
     text_x = (new_width - text_width) // 2
-    draw.text((text_x, 5), title, font=font, fill="red")
+    text_y = TOP_MARGIN
+    draw.text((text_x, text_y), title, font=font, fill=TEXT_COLOR)
 
-    # вставляем QR-код ниже текста
+    # --- Вставляем QR ---
     qr_x = (new_width - qr_img.width) // 2
-    final_img.paste(qr_img, (qr_x, text_height + 10))
+    qr_y = TOP_MARGIN + text_height + BETWEEN_MARGIN
+    final_img.paste(qr_img, (qr_x, qr_y))
 
-    # сохраняем финальное изображение
+    # --- Сохраняем изображение ---
     final_img.save(filepath)
     qr_url = f"/static/qr/{filename}"
 
-    # --- обновляем список QR ---
+    # --- Обновляем список QR ---
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
         qr_list = await cursor.fetchall()
