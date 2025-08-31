@@ -1,5 +1,4 @@
-
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -19,10 +18,14 @@
     </div>
 
     <div class="container">
-        <form method="post" action="/generate_qr" class="qr-form">
+        <form method="post" action="/generate_qr" class="qr-form" id="qrForm">
             <h2>Создание нового QR-Кода</h2>
-            <input type="text" name="title" placeholder="Название" required>
-            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
+            <input type="text" name="title" id="titleInput" placeholder="Название" required>
+            <textarea name="qrdata" id="dataInput" placeholder="Данные для кодирования" required></textarea>
+            <input type="hidden" name="text_y" id="textYInput" value="10">
+            <div class="qr-preview">
+                <canvas id="qrCanvas" width="250" height="300"></canvas>
+            </div>
             <button type="submit">Генерировать</button>
         </form>
 
@@ -63,5 +66,67 @@
             {% endif %}
         </div>
     </div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+const canvas = document.getElementById("qrCanvas");
+const ctx = canvas.getContext("2d");
+
+const titleInput = document.getElementById("titleInput");
+const dataInput = document.getElementById("dataInput");
+const textYInput = document.getElementById("textYInput");
+
+let textY = parseInt(textYInput.value);
+let isDragging = false;
+
+async function drawQR() {
+    const title = titleInput.value || '';
+    const data = dataInput.value || '';
+    const FONT_SIZE = 32;
+    const TEXT_COLOR = "red";
+    const BETWEEN_MARGIN = 15;
+
+    const qrCanvas = document.createElement('canvas');
+    await QRCode.toCanvas(qrCanvas, data, { width: 200, margin: 1 });
+    const qrSize = qrCanvas.width;
+
+    canvas.width = qrSize + 20;
+    canvas.height = textY + FONT_SIZE + BETWEEN_MARGIN + qrCanvas.height + 10;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = TEXT_COLOR;
+    ctx.font = `bold ${FONT_SIZE}px sans-serif`;
+    const textWidth = ctx.measureText(title).width;
+    ctx.fillText(title, (canvas.width - textWidth) / 2, textY + FONT_SIZE);
+
+    const qrX = (canvas.width - qrCanvas.width) / 2;
+    const qrY = textY + FONT_SIZE + BETWEEN_MARGIN;
+    ctx.drawImage(qrCanvas, qrX, qrY);
+}
+
+titleInput.addEventListener('input', drawQR);
+dataInput.addEventListener('input', drawQR);
+
+canvas.addEventListener('mousedown', (e) => {
+    const y = e.offsetY;
+    if (y >= textY && y <= textY + 32) {
+        isDragging = true;
+    }
+});
+canvas.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        textY = e.offsetY - 16;
+        if (textY < 0) textY = 0;
+        textYInput.value = textY;
+        drawQR();
+    }
+});
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mouseleave', () => isDragging = false);
+
+drawQR();
+</script>
 </body>
 </html>
