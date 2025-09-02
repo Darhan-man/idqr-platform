@@ -51,7 +51,7 @@ async def login(request: Request, code: str = Form(...)):
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
-# --- ПАНЕЛЬ QR ---
+# --- ПАНЕЛЬ QR (только для админа) ---
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -64,6 +64,7 @@ async def dashboard_qr(request: Request):
         "qr_title": None,
         "active": "qr"
     })
+
 # --- Генерация QR ---
 @app.get("/generate_qr")
 async def generate_qr_redirect():
@@ -72,9 +73,9 @@ async def generate_qr_redirect():
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(
     request: Request,
-    qrdata: str = Form(...),
+    qrdata: str = Form(...),  # <- сюда теперь записывай ССЫЛКУ на модуль (например, /dashboard/cleaning)
     title: str = Form(...),
-    text_y: int = Form(10)  # получаем Y-позицию текста
+    text_y: int = Form(10)
 ):
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
@@ -89,11 +90,11 @@ async def generate_qr(
         await db.commit()
         qr_id = cursor.lastrowid
 
-    # --- Генерация QR ---
+    # --- Генерация QR с маршрутом /scan/{id} ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
-    # --- Параметры текста ---
+    # --- Текст под QR ---
     FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
     FONT_SIZE = 32
     TEXT_COLOR = "red"
@@ -101,42 +102,34 @@ async def generate_qr(
     MIN_WIDTH = 150
     MIN_HEIGHT = 150
 
-    # --- Шрифт ---
     try:
         font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
     except IOError:
         font = ImageFont.load_default()
 
-    # --- Измеряем текст ---
     draw_temp = ImageDraw.Draw(qr_img)
     bbox = draw_temp.textbbox((0, 0), title, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
 
-    # --- Размер холста ---
     new_width = max(qr_img.width, text_width, MIN_WIDTH) + 20
     new_height = text_y + text_height + BETWEEN_MARGIN + qr_img.height + 10
     if new_height < MIN_HEIGHT:
         new_height = MIN_HEIGHT
 
-    # --- Создаем холст ---
     final_img = Image.new("RGB", (new_width, new_height), "white")
     draw = ImageDraw.Draw(final_img)
 
-    # --- Рисуем текст ---
     text_x = (new_width - text_width) // 2
     draw.text((text_x, text_y), title, font=font, fill=TEXT_COLOR)
 
-    # --- Вставляем QR ---
     qr_x = (new_width - qr_img.width) // 2
     qr_y = text_y + text_height + BETWEEN_MARGIN
     final_img.paste(qr_img, (qr_x, qr_y))
 
-    # --- Сохраняем изображение ---
     final_img.save(filepath)
     qr_url = f"/static/qr/{filename}"
 
-    # --- Обновляем список QR ---
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
         qr_list = await cursor.fetchall()
@@ -148,7 +141,6 @@ async def generate_qr(
         "qr_list": qr_list,
         "active": "qr"
     })
-
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
@@ -163,6 +155,7 @@ async def scan_qr(qr_id: int):
                 (scan_count + 1, datetime.now().isoformat(), qr_id)
             )
             await db.commit()
+            # ВАЖНО: теперь редирект только на сохранённую ссылку (например /dashboard/cleaning)
             return RedirectResponse(data)
     return RedirectResponse("/", status_code=303)
 
@@ -186,12 +179,19 @@ async def delete_qr(qr_id: int):
 async def modules(request: Request):
     return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
 
-# --- ПОЛЬЗОВАТЕЛИ ---
+@app.get("/dashboard/business", response_class=HTMLResponse)
+async def business_module(request: Request):
+    return templates.TemplateResponse("business.html", {"request": request})
+
+@app.get("/dashboard/cleaning", response_class=HTMLResponse)
+async def cleaning_services(request: Request):
+    return templates.TemplateResponse("cleaning.html", {"request": request})
+
+# --- ТОЛЬКО для админа ---
 @app.get("/dashboard/users", response_class=HTMLResponse)
 async def users(request: Request):
     return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
 
-# --- СТАТИСТИКА ---
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -207,20 +207,10 @@ async def stats(request: Request):
         "stats_list": stats_list
     })
 
-# --- НАСТРОЙКИ ---
 @app.get("/dashboard/settings", response_class=HTMLResponse)
 async def settings(request: Request):
     return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
 
-# --- ВСЕ УСЛУГИ ---
 @app.get("/dashboard/services", response_class=HTMLResponse)
 async def all_services(request: Request):
     return templates.TemplateResponse("services.html", {"request": request})
-
-@app.get("/dashboard/business", response_class=HTMLResponse)
-async def business_module(request: Request):
-    return templates.TemplateResponse("business.html", {"request": request})
-
-@app.get("/dashboard/cleaning", response_class=HTMLResponse)
-async def cleaning_services(request: Request):
-    return templates.TemplateResponse("cleaning.html", {"request": request})
