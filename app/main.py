@@ -9,22 +9,31 @@ import uuid
 from datetime import datetime
 import aiosqlite
 from PIL import Image, ImageDraw, ImageFont
+import secrets
 
+# --- Инициализация приложения ---
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SESSION_SECRET", "change-me"))
 
+# Генерация ключа, если он не задан в Render
+SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
+
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+
+# Статика и шаблоны
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# Константы
 QR_FOLDER = os.path.join("static", "qr")
 FONT_PATH = os.path.join("static", "fonts", "RobotoSlab-Bold.ttf")
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
-BASE_URL = os.environ.get("BASE_URL", "https://idqr-platform.onrender.com")
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 
 os.makedirs(QR_FOLDER, exist_ok=True)
 
 
+# --- База данных ---
 @app.on_event("startup")
 async def startup():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -49,7 +58,7 @@ async def startup():
         await db.commit()
 
 
-# --- Главные страницы и логин ---
+# --- Главная и логин ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -81,7 +90,7 @@ async def dashboard_qr(request: Request):
     })
 
 
-# --- Генерация QR (админ) ---
+# --- Генерация QR ---
 @app.get("/generate_qr")
 async def generate_qr_redirect():
     return RedirectResponse(url="/dashboard/qr")
@@ -181,7 +190,7 @@ async def scan_qr(qr_id: int, request: Request):
     return RedirectResponse("/", status_code=303)
 
 
-# --- Middleware: редирект на главную вместо 403 ---
+# --- Middleware: редирект вместо 403 ---
 @app.middleware("http")
 async def restrict_pages(request: Request, call_next):
     path = request.url.path
@@ -196,11 +205,10 @@ async def restrict_pages(request: Request, call_next):
     if allowed and path.startswith(allowed):
         return await call_next(request)
 
-    # редирект на главную вместо 403
     return RedirectResponse("/", status_code=303)
 
 
-# --- Страницы модулей ---
+# --- Другие страницы ---
 @app.get("/dashboard/modules", response_class=HTMLResponse)
 async def modules(request: Request):
     return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
@@ -216,7 +224,6 @@ async def cleaning_services(request: Request):
     return templates.TemplateResponse("cleaning.html", {"request": request})
 
 
-# --- Админские страницы ---
 @app.get("/dashboard/users", response_class=HTMLResponse)
 async def users(request: Request):
     if not request.session.get("is_admin"):
