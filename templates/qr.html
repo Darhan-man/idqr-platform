@@ -1,10 +1,26 @@
-
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>Панель QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Центровка и перенос длинного текста */
+        .qr-preview {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .qr-title {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            word-wrap: break-word;   /* перенос длинных слов */
+            overflow-wrap: break-word; /* поддержка для разных браузеров */
+            max-width: 300px; /* ограничиваем ширину текста */
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -15,7 +31,6 @@
             <a href="/dashboard/users" class="{{ 'active' if active == 'users' else '' }}">👤 Пользователи</a>
             <a href="/dashboard/stats" class="{{ 'active' if active == 'stats' else '' }}">📊 Статистика</a>
             <a href="/dashboard/settings" class="{{ 'active' if active == 'settings' else '' }}">⚙️ Настройки</a>
-            
         </nav>
     </div>
 
@@ -30,6 +45,9 @@
         {% if qr_url %}
             <div class="qr-preview">
                 <img src="{{ qr_url }}" alt="QR">
+                {% if qr_title %}
+                    <div class="qr-title">{{ qr_title }}</div>
+                {% endif %}
             </div>
         {% endif %}
 
@@ -66,4 +84,3 @@
     </div>
 </body>
 </html>
-
