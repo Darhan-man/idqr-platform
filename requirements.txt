@@ -1,8 +1,22 @@
-﻿fastapi
-uvicorn
-jinja2
-qrcode
-pillow
-aiosqlite
-python-multipart
+# --- Основные зависимости ---
+fastapi            # фреймворк для создания веб-приложений и API
+uvicorn            # ASGI-сервер для запуска FastAPI
 
+# --- Шаблоны и статика ---
+jinja2             # шаблонизатор HTML для FastAPI
+python-multipart   # поддержка форм (Form, UploadFile)
+
+# --- База данных ---
+aiosqlite          # асинхронная работа с SQLite
+
+# --- QR-коды и графика ---
+qrcode             # генерация QR-кодов
+pillow             # работа с изображениями (логотипы, отрисовка текста)
+
+# --- Безопасность ---
+itsdangerous       # для SessionMiddleware (подпись и шифрование cookie)
+
+# --- (опционально, если планируется) ---
+# sqlalchemy        # если в будущем захочешь перейти с aiosqlite на ORM
+# passlib           # для хэширования паролей (если будет полноценная авторизация)
+# python-jose       # для JWT-токенов (если понадобится API с токенами)
