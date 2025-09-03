@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Plai
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import qrcode
 import os
@@ -21,25 +22,28 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
 # --- Middleware для защиты страниц ---
-@app.middleware("http")
-async def restrict_middleware(request: Request, call_next):
-    path = request.url.path
+class RestrictMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
 
-    # публичные страницы
-    if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
-        return await call_next(request)
+        # публичные страницы
+        if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
+            return await call_next(request)
 
-    # доступ для админа
-    if request.session.get("is_admin"):
-        return await call_next(request)
+        # доступ для админа
+        if request.session.get("is_admin"):
+            return await call_next(request)
 
-    # доступ после сканирования QR
-    allowed = request.session.get("allowed_page")
-    if allowed and path.startswith(allowed):
-        return await call_next(request)
+        # доступ после сканирования QR
+        allowed = request.session.get("allowed_page")
+        if allowed and path.startswith(allowed):
+            return await call_next(request)
 
-    # иначе редирект на главную
-    return RedirectResponse("/", status_code=303)
+        # иначе редирект на главную
+        return RedirectResponse("/", status_code=303)
+
+# Подключаем middleware
+app.add_middleware(RestrictMiddleware)
 
 # --- Папка QR ---
 QR_FOLDER = os.path.join("static", "qr")
