@@ -15,16 +15,16 @@ import secrets
 # --- Инициализация приложения ---
 app = FastAPI()
 
-# ✅ Постоянный секрет из переменной окружения (для продакшена задай SESSION_SECRET в Render)
+# ✅ Постоянный секрет (лучше задать через переменные окружения на Render)
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
-# --- Ограничивающее middleware (после SessionMiddleware!) ---
+# --- Ограничивающее middleware ---
 class RestrictMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
-        # Публичные пути — пропускаем
+        # Публичные пути
         if (
             path.startswith("/static")
             or path.startswith("/scan")
@@ -32,26 +32,26 @@ class RestrictMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        # Админ — можно всё
+        # Админ — полный доступ
         if request.session.get("is_admin"):
             return await call_next(request)
 
-        # После скана разрешаем только нужный раздел (префиксно)
+        # Пользователь после скана — доступ только к разрешённому пути
         allowed = request.session.get("allowed_page")
         if allowed and path.startswith(allowed):
             return await call_next(request)
 
-        # Иначе — домой
+        # Всё остальное — редирект на главную
         return RedirectResponse("/", status_code=303)
 
-# ⚠️ Очень важно: подключаем наш ограничитель ПОСЛЕ SessionMiddleware
+# ⚠️ Подключаем ограничитель ПОСЛЕ SessionMiddleware
 app.add_middleware(RestrictMiddleware)
 
-# Статика и шаблоны
+# --- Настройка статики и шаблонов ---
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Константы
+# --- Константы ---
 QR_FOLDER = os.path.join("static", "qr")
 FONT_PATH = os.path.join("static", "fonts", "RobotoSlab-Bold.ttf")
 DB_PATH = "qr_data.db"
@@ -75,6 +75,7 @@ async def startup():
         """)
         await db.commit()
 
+        # Добавляем недостающие колонки
         cursor = await db.execute("PRAGMA table_info(qr_codes)")
         cols = await cursor.fetchall()
         colnames = [c[1] for c in cols]
@@ -84,7 +85,7 @@ async def startup():
             await db.execute("ALTER TABLE qr_codes ADD COLUMN last_scan TEXT")
         await db.commit()
 
-# --- Главная и логин ---
+# --- Главная страница и вход ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -96,7 +97,7 @@ async def login(request: Request, code: str = Form(...)):
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
-# --- Панель QR (админ) ---
+# --- Админ-панель (QR список) ---
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
     if not request.session.get("is_admin"):
@@ -206,7 +207,7 @@ async def scan_qr(qr_id: int, request: Request):
             )
             await db.commit()
 
-            # 🎯 Разрешаем доступ только к этому разделу
+            # 🎯 После скана разрешаем только этот раздел
             request.session["allowed_page"] = data
             return RedirectResponse(data)
     return RedirectResponse("/", status_code=303)
