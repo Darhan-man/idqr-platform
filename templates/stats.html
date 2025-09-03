@@ -20,6 +20,10 @@
         td b {
             color: darkblue;
         }
+        .navbar nav a.active {
+            font-weight: bold;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -39,16 +43,30 @@
 
         {% if stats_list %}
         <table>
-            <tr>
-                <th>ID</th>
-                <th>Название</th>
-                <th>Ссылка</th>
-                <th>Сканов</th>
-                <th>Последний скан</th>
-            </tr>
-            {% for qr in stats_list %}
-            <tr>
-                <td>{{ qr[0] }}</td>
-                <td>{{ qr[1] }}</td>
-                <td><a href="{{ qr[2] }}" target="_blank">{{ qr[2] }}</a></td>
-                <td><b>{{ qr[4] }
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Ссылка</th>
+                    <th>Сканов</th>
+                    <th>Последний скан</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for qr in stats_list %}
+                <tr>
+                    <td>{{ qr[0] }}</td>
+                    <td>{{ qr[1] }}</td>
+                    <td><a href="{{ qr[2] }}" target="_blank">{{ qr[2] }}</a></td>
+                    <td><b>{{ qr[4] }}</b></td>
+                    <td>{{ qr[5] if qr[5] else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>Данные отсутствуют. QR-коды ещё не созданы или никто их не сканировал.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
