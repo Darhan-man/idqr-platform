@@ -1,9 +1,8 @@
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 
 import qrcode
 import os
@@ -22,34 +21,31 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
 # --- Middleware для защиты страниц ---
-class RestrictMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+@app.middleware("http")
+async def restrict_middleware(request: Request, call_next):
+    path = request.url.path
 
-        # публичные страницы
-        if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
-            return await call_next(request)
+    # публичные страницы
+    if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
+        return await call_next(request)
 
-        # доступ для админа
-        if request.session.get("is_admin"):
-            return await call_next(request)
+    # доступ для админа
+    if request.session.get("is_admin"):
+        return await call_next(request)
 
-        # доступ после сканирования QR
-        allowed = request.session.get("allowed_page")
-        if allowed and path.startswith(allowed):
-            return await call_next(request)
+    # доступ после сканирования QR
+    allowed = request.session.get("allowed_page")
+    if allowed and path.startswith(allowed):
+        return await call_next(request)
 
-        # иначе редирект на главную
-        return RedirectResponse("/", status_code=303)
-
-# ⚠️ Middleware порядок важен
-app.add_middleware(RestrictMiddleware)
+    # иначе редирект на главную
+    return RedirectResponse("/", status_code=303)
 
 # --- Папка QR ---
 QR_FOLDER = os.path.join("static", "qr")
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# --- БД ---
+# --- База данных ---
 DB_PATH = "qr_data.db"
 
 async def init_db():
@@ -78,7 +74,10 @@ async def home(request: Request):
 
 @app.get("/robots.txt")
 async def robots():
-    return RedirectResponse("/static/robots.txt")
+    robots_path = os.path.join("static", "robots.txt")
+    if os.path.exists(robots_path):
+        return FileResponse(robots_path)
+    return PlainTextResponse("User-agent: *\nDisallow:", status_code=200)
 
 # --- Логин админа ---
 ADMIN_CODE = "1990"
@@ -107,7 +106,6 @@ async def dashboard_qr(request: Request):
 async def generate_qr(title: str = Form(...), url: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
     img = qrcode.make(url)
     img.save(filepath)
@@ -138,7 +136,6 @@ async def scan_qr(request: Request, qr_id: int):
         )
         await db.commit()
 
-    # разрешение доступа к панели QR
     request.session["allowed_page"] = "/dashboard/qr"
 
     return RedirectResponse(row[0], status_code=302)
