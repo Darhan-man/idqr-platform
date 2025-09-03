@@ -5,7 +5,6 @@
     <title>Панель QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        /* Центровка и перенос длинного текста */
         .qr-preview {
             text-align: center;
             margin: 20px 0;
@@ -14,9 +13,9 @@
             margin-top: 10px;
             font-size: 18px;
             font-weight: bold;
-            word-wrap: break-word;   /* перенос длинных слов */
-            overflow-wrap: break-word; /* поддержка для разных браузеров */
-            max-width: 300px; /* ограничиваем ширину текста */
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 300px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -35,21 +34,12 @@
     </div>
 
     <div class="container">
-        <form method="post" action="/generate_qr" class="qr-form">
+        <form method="post" action="/generate" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
             <input type="text" name="title" placeholder="Название" required>
-            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
+            <input type="text" name="url" placeholder="Ссылка для QR" required>
             <button type="submit">Генерировать</button>
         </form>
-
-        {% if qr_url %}
-            <div class="qr-preview">
-                <img src="{{ qr_url }}" alt="QR">
-                {% if qr_title %}
-                    <div class="qr-title">{{ qr_title }}</div>
-                {% endif %}
-            </div>
-        {% endif %}
 
         <div class="qr-list">
             <h2>Список сгенерированных QR-кодов</h2>
@@ -60,6 +50,7 @@
                             <th>Название</th>
                             <th>Дата</th>
                             <th>Файл</th>
+                            <th>Сканов</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
@@ -67,11 +58,12 @@
                         {% for qr in qr_list %}
                         <tr>
                             <td>{{ qr[1] }}</td>
-                            <td>{{ qr[4] }}</td>
+                            <td>{{ qr[5] or qr[4] }}</td>
                             <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
+                            <td>{{ qr[4] }}</td>
                             <td>
-                                <a href="/delete_qr/{{ qr[0] }}" class="btn-delete">Удалить</a>
-                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">Поделиться</a>
+                                <a href="/delete_qr/{{ qr[0] }}" style="color:red;">Удалить</a>
+                                <a href="/static/qr/{{ qr[3] }}" download>Скачать</a>
                             </td>
                         </tr>
                         {% endfor %}
