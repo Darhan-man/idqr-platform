@@ -4,22 +4,6 @@
     <meta charset="UTF-8">
     <title>Панель QR-кодов</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <style>
-        .qr-preview {
-            text-align: center;
-            margin: 20px 0;
-        }
-        .qr-title {
-            margin-top: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 300px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-    </style>
 </head>
 <body>
     <div class="navbar">
@@ -48,8 +32,9 @@
                     <thead>
                         <tr>
                             <th>Название</th>
-                            <th>Дата</th>
-                            <th>Файл</th>
+                            <th>Ссылка</th>
+                            <th>Создано</th>
+                            <th>Последний скан</th>
                             <th>Сканов</th>
                             <th>Действия</th>
                         </tr>
@@ -58,12 +43,14 @@
                         {% for qr in qr_list %}
                         <tr>
                             <td>{{ qr[1] }}</td>
-                            <td>{{ qr[5] or qr[4] }}</td>
-                            <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
+                            <td><a href="{{ qr[2] }}" target="_blank">Открыть</a></td>
+                            <td>{{ qr[4] }}</td>
+                            <td>{{ qr[5] or '—' }}</td>
                             <td>{{ qr[4] }}</td>
                             <td>
+                                <a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a> |
+                                <a href="/static/qr/{{ qr[3] }}" download>Скачать</a> |
                                 <a href="/delete_qr/{{ qr[0] }}" style="color:red;">Удалить</a>
-                                <a href="/static/qr/{{ qr[3] }}" download>Скачать</a>
                             </td>
                         </tr>
                         {% endfor %}
