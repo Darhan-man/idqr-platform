@@ -9,7 +9,6 @@ import os
 import uuid
 from datetime import datetime
 import aiosqlite
-from PIL import Image, ImageDraw, ImageFont
 import secrets
 
 # --- Инициализация приложения ---
@@ -53,7 +52,6 @@ templates = Jinja2Templates(directory="templates")
 
 # --- Константы ---
 QR_FOLDER = os.path.join("static", "qr")
-FONT_PATH = os.path.join("static", "fonts", "RobotoSlab-Bold.ttf")
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
@@ -207,7 +205,21 @@ async def stats(request: Request):
             FROM qr_codes
             ORDER BY id DESC
         """)
-        stats_list = await cursor.fetchall()
+        rows = await cursor.fetchall()
+
+    # 🔥 Обрабатываем для удобного отображения
+    stats_list = []
+    for row in rows:
+        qr_id, title, data, filename, scan_count, last_scan = row
+        stats_list.append({
+            "id": qr_id,
+            "title": title,
+            "data": data,
+            "filename": filename,
+            "scan_count": scan_count if scan_count else "Ещё не сканировался",
+            "last_scan": last_scan if last_scan else "Нет данных"
+        })
+
     return templates.TemplateResponse("stats.html", {
         "request": request,
         "active": "stats",
