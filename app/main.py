@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import qrcode
 import os
 import uuid
@@ -14,10 +15,37 @@ import secrets
 # --- Инициализация приложения ---
 app = FastAPI()
 
-# Генерация ключа, если он не задан в Render
+# ✅ Постоянный секрет из переменной окружения (для продакшена задай SESSION_SECRET в Render)
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+# --- Ограничивающее middleware (после SessionMiddleware!) ---
+class RestrictMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # Публичные пути — пропускаем
+        if (
+            path.startswith("/static")
+            or path.startswith("/scan")
+            or path in ["/", "/login", "/favicon.ico", "/robots.txt"]
+        ):
+            return await call_next(request)
+
+        # Админ — можно всё
+        if request.session.get("is_admin"):
+            return await call_next(request)
+
+        # После скана разрешаем только нужный раздел (префиксно)
+        allowed = request.session.get("allowed_page")
+        if allowed and path.startswith(allowed):
+            return await call_next(request)
+
+        # Иначе — домой
+        return RedirectResponse("/", status_code=303)
+
+# ⚠️ Очень важно: подключаем наш ограничитель ПОСЛЕ SessionMiddleware
+app.add_middleware(RestrictMiddleware)
 
 # Статика и шаблоны
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -31,7 +59,6 @@ ADMIN_CODE = "1990"
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 
 os.makedirs(QR_FOLDER, exist_ok=True)
-
 
 # --- База данных ---
 @app.on_event("startup")
@@ -57,12 +84,10 @@ async def startup():
             await db.execute("ALTER TABLE qr_codes ADD COLUMN last_scan TEXT")
         await db.commit()
 
-
 # --- Главная и логин ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
-
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, code: str = Form(...)):
@@ -70,7 +95,6 @@ async def login(request: Request, code: str = Form(...)):
         request.session["is_admin"] = True
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
-
 
 # --- Панель QR (админ) ---
 @app.get("/dashboard/qr", response_class=HTMLResponse)
@@ -89,12 +113,10 @@ async def dashboard_qr(request: Request):
         "active": "qr"
     })
 
-
 # --- Генерация QR ---
 @app.get("/generate_qr")
 async def generate_qr_redirect():
     return RedirectResponse(url="/dashboard/qr")
-
 
 @app.post("/generate_qr", response_class=HTMLResponse)
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...), text_y: int = Form(10)):
@@ -170,7 +192,6 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         "active": "qr"
     })
 
-
 # --- Сканирование QR ---
 @app.get("/scan/{qr_id}")
 async def scan_qr(qr_id: int, request: Request):
@@ -185,51 +206,29 @@ async def scan_qr(qr_id: int, request: Request):
             )
             await db.commit()
 
+            # 🎯 Разрешаем доступ только к этому разделу
             request.session["allowed_page"] = data
             return RedirectResponse(data)
     return RedirectResponse("/", status_code=303)
 
-
-# --- Middleware: редирект вместо 403 ---
-@app.middleware("http")
-async def restrict_pages(request: Request, call_next):
-    path = request.url.path
-
-    if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
-        return await call_next(request)
-
-    if request.session.get("is_admin"):
-        return await call_next(request)
-
-    allowed = request.session.get("allowed_page")
-    if allowed and path.startswith(allowed):
-        return await call_next(request)
-
-    return RedirectResponse("/", status_code=303)
-
-
-# --- Другие страницы ---
+# --- Остальные страницы ---
 @app.get("/dashboard/modules", response_class=HTMLResponse)
 async def modules(request: Request):
     return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
-
 
 @app.get("/dashboard/business", response_class=HTMLResponse)
 async def business_module(request: Request):
     return templates.TemplateResponse("business.html", {"request": request})
 
-
 @app.get("/dashboard/cleaning", response_class=HTMLResponse)
 async def cleaning_services(request: Request):
     return templates.TemplateResponse("cleaning.html", {"request": request})
-
 
 @app.get("/dashboard/users", response_class=HTMLResponse)
 async def users(request: Request):
     if not request.session.get("is_admin"):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse("users.html", {"request": request, "active": "users"})
-
 
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
@@ -248,13 +247,11 @@ async def stats(request: Request):
         "stats_list": stats_list
     })
 
-
 @app.get("/dashboard/settings", response_class=HTMLResponse)
 async def settings(request: Request):
     if not request.session.get("is_admin"):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
-
 
 @app.get("/dashboard/services", response_class=HTMLResponse)
 async def all_services(request: Request):
