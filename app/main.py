@@ -8,48 +8,48 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import qrcode
 import os
 import uuid
-import secrets
 from datetime import datetime
 import aiosqlite
+import secrets
 
 # --- Инициализация приложения ---
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# --- Настройки сессий ---
+# --- Сессии ---
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
-# --- Ограничивающее middleware ---
+# --- Middleware для защиты страниц ---
 class RestrictMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
-        # Публичные пути
+        # публичные страницы
         if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
             return await call_next(request)
 
-        # Доступ для админа
+        # доступ для админа
         if request.session.get("is_admin"):
             return await call_next(request)
 
-        # Доступ после сканирования QR
+        # доступ после сканирования QR
         allowed = request.session.get("allowed_page")
         if allowed and path.startswith(allowed):
             return await call_next(request)
 
-        # Иначе редирект на главную
+        # иначе редирект на главную
         return RedirectResponse("/", status_code=303)
 
-# ⚠️ Важно: middleware в правильном порядке
+# ⚠️ Middleware порядок важен
 app.add_middleware(RestrictMiddleware)
 
-# --- Папка для QR-кодов ---
+# --- Папка QR ---
 QR_FOLDER = os.path.join("static", "qr")
 os.makedirs(QR_FOLDER, exist_ok=True)
 
-# --- Инициализация БД ---
+# --- БД ---
 DB_PATH = "qr_data.db"
 
 async def init_db():
@@ -71,7 +71,7 @@ async def init_db():
 async def startup():
     await init_db()
 
-# --- Главная страница и robots.txt ---
+# --- Главная и robots.txt ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -90,7 +90,7 @@ async def login(request: Request, code: str = Form(...)):
         return RedirectResponse("/dashboard/qr", status_code=303)
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
-# --- Панель управления QR-кодами ---
+# --- Панель QR ---
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
     if not request.session.get("is_admin"):
@@ -102,7 +102,7 @@ async def dashboard_qr(request: Request):
 
     return templates.TemplateResponse("qr.html", {"request": request, "qr_list": qr_list, "active": "qr"})
 
-# --- Генерация QR-кода ---
+# --- Генерация QR ---
 @app.post("/generate")
 async def generate_qr(title: str = Form(...), url: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
@@ -121,7 +121,7 @@ async def generate_qr(title: str = Form(...), url: str = Form(...)):
 
     return RedirectResponse("/dashboard/qr", status_code=303)
 
-# --- Сканирование QR-кода ---
+# --- Сканирование QR ---
 @app.get("/scan/{qr_id}")
 async def scan_qr(request: Request, qr_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -138,7 +138,7 @@ async def scan_qr(request: Request, qr_id: int):
         )
         await db.commit()
 
-    # Разрешаем доступ только к панели QR-кодов
+    # разрешение доступа к панели QR
     request.session["allowed_page"] = "/dashboard/qr"
 
     return RedirectResponse(row[0], status_code=302)
@@ -154,3 +154,21 @@ async def stats(request: Request):
         stats_list = await cursor.fetchall()
 
     return templates.TemplateResponse("stats.html", {"request": request, "stats_list": stats_list, "active": "stats"})
+
+# --- Удаление QR ---
+@app.get("/delete_qr/{qr_id}")
+async def delete_qr(request: Request, qr_id: int):
+    if not request.session.get("is_admin"):
+        return RedirectResponse("/", status_code=303)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
+        row = await cursor.fetchone()
+        if row:
+            file_path = os.path.join(QR_FOLDER, row[0])
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
+            await db.commit()
+
+    return RedirectResponse("/dashboard/qr", status_code=303)
