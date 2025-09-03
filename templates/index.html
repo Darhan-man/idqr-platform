@@ -1,22 +1,47 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Вход в систему</title>
+    <title>IDQR — Вход</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <h1>Вход в панель управления</h1>
-            {% if error %}
-                <p class="error">{{ error }}</p>
-            {% endif %}
-            <form method="post" action="/login">
-                <input type="text" name="code" placeholder="Введите код доступа" required>
-                <button type="submit">Войти</button>
-            </form>
-        </div>
+    <div class="navbar">
+        <h1>IDQR: Вход</h1>
+        <nav>
+            <a href="#" class="disabled">📦 QR-Коды</a>
+            <a href="#" class="disabled">🧩 Модули</a>
+            <a href="#" class="disabled">👤 Пользователи</a>
+            <a href="#" class="disabled">📊 Статистика</a>
+            <a href="#" class="disabled">⚙️ Настройки</a>
+        </nav>
     </div>
+
+    <div class="container" style="max-width: 400px; margin: 50px auto; text-align: center;">
+        <h2>🔐 Авторизация администратора</h2>
+
+        {% if error %}
+            <p style="color: red;">{{ error }}</p>
+        {% endif %}
+
+        <form method="post" action="/login" style="margin-top: 20px;">
+            <input type="password" name="code" placeholder="Введите код" required
+                   style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px;">
+            <button type="submit"
+                    style="width: 100%; padding: 10px; background-color: #007bff; color: white;
+                           border: none; border-radius: 5px; cursor: pointer;">
+                Войти
+            </button>
+        </form>
+    </div>
+
+    <style>
+        nav a.disabled {
+            pointer-events: none;
+            color: #aaa;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+    </style>
 </body>
 </html>
