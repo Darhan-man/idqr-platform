@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <title>Статистика</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background: #f2f2f2;
+        }
+        td b {
+            color: darkblue;
+        }
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -21,7 +38,7 @@
         <h2>📊 Аналитика QR-кодов</h2>
 
         {% if stats_list %}
-        <table border="1" cellpadding="8" cellspacing="0" width="100%">
+        <table>
             <tr>
                 <th>ID</th>
                 <th>Название</th>
@@ -34,14 +51,4 @@
                 <td>{{ qr[0] }}</td>
                 <td>{{ qr[1] }}</td>
                 <td><a href="{{ qr[2] }}" target="_blank">{{ qr[2] }}</a></td>
-                <td><b>{{ qr[4] }}</b></td>
-                <td>{{ qr[5] if qr[5] else "—" }}</td>
-            </tr>
-            {% endfor %}
-        </table>
-        {% else %}
-        <p>Пока нет данных для статистики.</p>
-        {% endif %}
-    </div>
-</body>
-</html>
+                <td><b>{{ qr[4] }
