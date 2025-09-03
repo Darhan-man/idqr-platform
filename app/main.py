@@ -11,7 +11,6 @@ import uuid
 import secrets
 from datetime import datetime
 import aiosqlite
-from PIL import Image, ImageDraw, ImageFont
 
 # --- Инициализация приложения ---
 app = FastAPI()
@@ -20,6 +19,7 @@ templates = Jinja2Templates(directory="templates")
 
 # --- Настройки сессий ---
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 
 # --- Ограничивающее middleware ---
 class RestrictMiddleware(BaseHTTPMiddleware):
@@ -27,28 +27,27 @@ class RestrictMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Публичные пути
-        if (
-            path.startswith("/static")
-            or path.startswith("/scan")
-            or path in ["/", "/login", "/favicon.ico", "/robots.txt"]
-        ):
+        if path.startswith("/static") or path.startswith("/scan") or path in ["/", "/login", "/favicon.ico", "/robots.txt"]:
             return await call_next(request)
 
         # Доступ для админа
         if request.session.get("is_admin"):
             return await call_next(request)
 
-        # Доступ после сканирования QR — только в разрешённый раздел
+        # Доступ после сканирования QR
         allowed = request.session.get("allowed_page")
         if allowed and path.startswith(allowed):
             return await call_next(request)
 
-        # Иначе — редирект на главную
+        # Иначе редирект на главную
         return RedirectResponse("/", status_code=303)
 
-# ⚠️ Порядок имеет значение: RestrictMiddleware должен быть первым
+# ⚠️ Важно: middleware в правильном порядке
 app.add_middleware(RestrictMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
+
+# --- Папка для QR-кодов ---
+QR_FOLDER = os.path.join("static", "qr")
+os.makedirs(QR_FOLDER, exist_ok=True)
 
 # --- Инициализация БД ---
 DB_PATH = "qr_data.db"
@@ -56,15 +55,15 @@ DB_PATH = "qr_data.db"
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
-        CREATE TABLE IF NOT EXISTS qr_codes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            url TEXT,
-            filename TEXT,
-            created_at TEXT,
-            scan_count INTEGER DEFAULT 0,
-            last_scan TEXT
-        )
+            CREATE TABLE IF NOT EXISTS qr_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                url TEXT,
+                filename TEXT,
+                created_at TEXT,
+                scan_count INTEGER DEFAULT 0,
+                last_scan TEXT
+            )
         """)
         await db.commit()
 
@@ -72,29 +71,57 @@ async def init_db():
 async def startup():
     await init_db()
 
+# --- Главная страница и robots.txt ---
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/robots.txt")
+async def robots():
+    return RedirectResponse("/static/robots.txt")
+
+# --- Логин админа ---
+ADMIN_CODE = "1990"
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(request: Request, code: str = Form(...)):
+    if code == ADMIN_CODE:
+        request.session["is_admin"] = True
+        return RedirectResponse("/dashboard/qr", status_code=303)
+    return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
+
+# --- Панель управления QR-кодами ---
+@app.get("/dashboard/qr", response_class=HTMLResponse)
+async def dashboard_qr(request: Request):
+    if not request.session.get("is_admin"):
+        return RedirectResponse("/", status_code=303)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT id, title, url, filename, scan_count, last_scan FROM qr_codes ORDER BY id DESC")
+        qr_list = await cursor.fetchall()
+
+    return templates.TemplateResponse("qr.html", {"request": request, "qr_list": qr_list, "active": "qr"})
+
 # --- Генерация QR-кода ---
 @app.post("/generate")
 async def generate_qr(title: str = Form(...), url: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
-    filepath = os.path.join("static", "qr", filename)
-
-    # создаём директорию если её нет
+    filepath = os.path.join(QR_FOLDER, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-    # генерируем QR
     img = qrcode.make(url)
     img.save(filepath)
 
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "INSERT INTO qr_codes (title, url, filename, created_at) VALUES (?, ?, ?, ?)",
-            (title, url, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            (title, url, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         )
         await db.commit()
 
     return RedirectResponse("/dashboard/qr", status_code=303)
 
-# --- Сканирование QR ---
+# --- Сканирование QR-кода ---
 @app.get("/scan/{qr_id}")
 async def scan_qr(request: Request, qr_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -104,29 +131,26 @@ async def scan_qr(request: Request, qr_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="QR not found")
 
-    # фиксируем скан
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE qr_codes SET scan_count = scan_count + 1, last_scan = ? WHERE id = ?",
-            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), qr_id),
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), qr_id)
         )
         await db.commit()
 
-    # разрешаем доступ только в нужный раздел
-    request.session["allowed_page"] = f"/dashboard/qr/{qr_id}"
+    # Разрешаем доступ только к панели QR-кодов
+    request.session["allowed_page"] = "/dashboard/qr"
 
     return RedirectResponse(row[0], status_code=302)
 
 # --- Статистика ---
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
+    if not request.session.get("is_admin"):
+        return RedirectResponse("/", status_code=303)
+
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "SELECT id, title, url, filename, scan_count, last_scan FROM qr_codes"
-        )
+        cursor = await db.execute("SELECT id, title, url, filename, scan_count, last_scan FROM qr_codes ORDER BY id DESC")
         stats_list = await cursor.fetchall()
 
-    return templates.TemplateResponse(
-        "stats.html",
-        {"request": request, "stats_list": stats_list},
-    )
+    return templates.TemplateResponse("stats.html", {"request": request, "stats_list": stats_list, "active": "stats"})
