@@ -1,3 +1,5 @@
+
+﻿
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -155,4 +157,4 @@ async def business_module(request: Request):
 # Уборка и гигиена
 @app.get("/dashboard/cleaning", response_class=HTMLResponse)
 async def cleaning_services(request: Request):
-    return templates.TemplateResponse("cleaning.html", {"request": request}
+    return templates.TemplateResponse("cleaning.html", {"request": request})
