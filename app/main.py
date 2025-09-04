@@ -159,10 +159,5 @@ async def cleaning_services(request: Request):
     return templates.TemplateResponse("cleaning.html", {"request": request})
 
 
-# 🚀 Запуск uvicorn
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))  # Render подставляет свой порт
-    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
