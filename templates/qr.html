@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -18,13 +19,18 @@
     </div>
 
     <div class="container">
-        <!-- Исправленный action и name -->
         <form method="post" action="/generate_qr" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
             <input type="text" name="title" placeholder="Название" required>
-            <input type="text" name="qrdata" placeholder="Ссылка для QR" required>
+            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
             <button type="submit">Генерировать</button>
         </form>
+
+        {% if qr_url %}
+            <div class="qr-preview">
+                <img src="{{ qr_url }}" alt="QR">
+            </div>
+        {% endif %}
 
         <div class="qr-list">
             <h2>Список сгенерированных QR-кодов</h2>
@@ -33,10 +39,8 @@
                     <thead>
                         <tr>
                             <th>Название</th>
-                            <th>Ссылка</th>
-                            <th>Создано</th>
-                            <th>Последний скан</th>
-                            <th>Сканов</th>
+                            <th>Дата</th>
+                            <th>Файл</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
@@ -44,14 +48,11 @@
                         {% for qr in qr_list %}
                         <tr>
                             <td>{{ qr[1] }}</td>
-                            <td><a href="{{ qr[2] }}" target="_blank">Открыть</a></td>
                             <td>{{ qr[4] }}</td>
-                            <td>{{ qr[6] or '—' }}</td>
-                            <td>{{ qr[5] }}</td>
+                            <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
                             <td>
-                                <a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a> |
-                                <a href="/static/qr/{{ qr[3] }}" download>Скачать</a> |
-                                <a href="/delete_qr/{{ qr[0] }}" style="color:red;">Удалить</a>
+                                <a href="/delete_qr/{{ qr[0] }}" class="btn-delete">Удалить</a>
+                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">Поделиться</a>
                             </td>
                         </tr>
                         {% endfor %}
