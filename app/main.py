@@ -15,7 +15,7 @@ templates = Jinja2Templates(directory="templates")
 
 # --- Константы ---
 QR_FOLDER = "static/qr"
-FONT_PATH = "fonts/RobotoSlab-Bold.ttf"
+FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
 BASE_URL = "https://idqr-platform.onrender.com"  # твой полный URL на Render
