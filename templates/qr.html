@@ -18,12 +18,13 @@
     </div>
 
     <div class="container">
-        <form method="post" action="/generate" class="qr-form">
+       <form method="post" action="/generate_qr" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
             <input type="text" name="title" placeholder="Название" required>
-            <input type="text" name="url" placeholder="Ссылка для QR" required>
+            <input type="text" name="qrdata" placeholder="Ссылка для QR" required>
             <button type="submit">Генерировать</button>
-        </form>
+       </form>
+
 
         <div class="qr-list">
             <h2>Список сгенерированных QR-кодов</h2>
