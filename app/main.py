@@ -66,27 +66,12 @@ async def dashboard_qr(request: Request):
 
 
 # Генерация QR
-@app.post("/generate_qr", response_class=HTMLResponse)
-async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
+@app.post("/generate", response_class=HTMLResponse)
+async def generate_qr(request: Request, url: str = Form(...), title: str = Form(...)):
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # сначала сохраним данные в БД, чтобы получить ID
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
-            (title, qrdata, filename, now)
-        )
-        await db.commit()
-        qr_id = cursor.lastrowid
-        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-        qr_list = await cursor.fetchall()
-
-    # теперь генерируем QR-код, вшивая в него ссылку через наш сервер
-    qr_link = f"https://idqr-platform.onrender.com/r/{qr_id}"
-    qr_img = qrcode.make(qr_link).convert("RGB")
+    qr_img = qrcode.make(url).convert("RGB")
 
     try:
         font = ImageFont.truetype(FONT_PATH, 32)
@@ -108,6 +93,16 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     final_img.paste(qr_img, (qr_x, text_height + 20))
 
     final_img.save(filepath)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
+            (title, url, filename, now)
+        )
+        await db.commit()
+        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+        qr_list = await cursor.fetchall()
 
     qr_url = f"/static/qr/{filename}"
     return templates.TemplateResponse("qr.html", {
