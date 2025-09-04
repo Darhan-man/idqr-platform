@@ -15,7 +15,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 QR_FOLDER = "static/qr"
-FONT_PATH = "fonts/RobotoSlab-Bold.ttf"
+FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
 
