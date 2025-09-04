@@ -18,13 +18,13 @@
     </div>
 
     <div class="container">
-       <form method="post" action="/generate_qr" class="qr-form">
+        <!-- Исправленный action и name -->
+        <form method="post" action="/generate_qr" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
             <input type="text" name="title" placeholder="Название" required>
             <input type="text" name="qrdata" placeholder="Ссылка для QR" required>
             <button type="submit">Генерировать</button>
-       </form>
-
+        </form>
 
         <div class="qr-list">
             <h2>Список сгенерированных QR-кодов</h2>
@@ -46,8 +46,8 @@
                             <td>{{ qr[1] }}</td>
                             <td><a href="{{ qr[2] }}" target="_blank">Открыть</a></td>
                             <td>{{ qr[4] }}</td>
-                            <td>{{ qr[5] or '—' }}</td>
-                            <td>{{ qr[4] }}</td>
+                            <td>{{ qr[6] or '—' }}</td>
+                            <td>{{ qr[5] }}</td>
                             <td>
                                 <a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a> |
                                 <a href="/static/qr/{{ qr[3] }}" download>Скачать</a> |
