@@ -85,33 +85,71 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
-    # --- Добавляем текст над QR ---
-    try:
-        font = ImageFont.truetype(FONT_PATH, 32)  # шрифт поддерживает кириллицу
-    except IOError:
-        font = ImageFont.load_default()
+    # --- Функция для текста над QR ---
+    def draw_title_over_qr(qr_img, title, font_path=FONT_PATH, max_width=None):
+        from PIL import ImageDraw, ImageFont
+        if max_width is None:
+            max_width = qr_img.width
 
-    # измеряем текст
-    draw_temp = ImageDraw.Draw(qr_img)
-    bbox = draw_temp.textbbox((0, 0), title, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+        font_size = 32
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+        except IOError:
+            font = ImageFont.load_default()
 
-    # создаем новый холст: сверху текст, снизу QR
-    new_width = max(qr_img.width, text_width + 20)
-    new_height = qr_img.height + text_height + 20
-    final_img = Image.new("RGB", (new_width, new_height), "white")
-    draw = ImageDraw.Draw(final_img)
+        draw = ImageDraw.Draw(qr_img)
 
-    # рисуем текст сверху
-    text_x = (new_width - text_width) // 2
-    draw.text((text_x, 5), title, font=font, fill="red")
+        # Автоуменьшение шрифта
+        while True:
+            bbox = draw.textbbox((0, 0), title, font=font)
+            text_width = bbox[2] - bbox[0]
+            if text_width <= max_width - 20 or font_size <= 12:
+                break
+            font_size -= 2
+            font = ImageFont.truetype(font_path, font_size)
 
-    # вставляем QR-код ниже текста
-    qr_x = (new_width - qr_img.width) // 2
-    final_img.paste(qr_img, (qr_x, text_height + 10))
+        # Разбиваем на строки
+        lines = []
+        words = title.split()
+        line = ""
+        for word in words:
+            test_line = f"{line} {word}".strip()
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            if bbox[2] > max_width - 20:
+                if line:
+                    lines.append(line)
+                line = word
+            else:
+                line = test_line
+        lines.append(line)
 
-    # сохраняем финальное изображение
+        # Создаём финальное изображение
+        text_height_total = sum([draw.textbbox((0,0), l, font=font)[3] - draw.textbbox((0,0), l, font=font)[1] + 5 for l in lines])
+        final_img = Image.new("RGB", (max(qr_img.width, max_width), qr_img.height + text_height_total + 10), "white")
+        draw_final = ImageDraw.Draw(final_img)
+
+        # Рисуем текст с обводкой
+        y = 5
+        for line in lines:
+            bbox = draw.textbbox((0,0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (final_img.width - text_width) // 2
+            # Обводка
+            for dx in [-1,0,1]:
+                for dy in [-1,0,1]:
+                    if dx!=0 or dy!=0:
+                        draw_final.text((x+dx, y+dy), line, font=font, fill="black")
+            draw_final.text((x, y), line, font=font, fill="red")
+            y += bbox[3] - bbox[1] + 5
+
+        # Вставляем QR-код
+        qr_x = (final_img.width - qr_img.width) // 2
+        final_img.paste(qr_img, (qr_x, y))
+
+        return final_img
+
+    # --- Создаём финальное изображение с текстом ---
+    final_img = draw_title_over_qr(qr_img, title)
     final_img.save(filepath)
     qr_url = f"/static/qr/{filename}"
 
