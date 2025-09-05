@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -18,58 +18,40 @@
     </div>
 
     <div class="container">
-        <!-- Форма генерации QR-кода -->
-        <form method="post" action="/generate_qr" class="qr-form" style="margin-bottom: 30px;">
+        <form method="post" action="/generate_qr" class="qr-form">
             <h2>Создание нового QR-Кода</h2>
-
-            <div>
-                <label>Название:</label>
-                <input type="text" name="title" placeholder="Название" required style="width: 300px;">
-            </div>
-
-            <div>
-                <label>Ссылка или данные:</label>
-                <textarea name="qrdata" placeholder="Данные для кодирования" required style="width: 300px; height: 80px;"></textarea>
-            </div>
-
-            <div>
-                <label>Цвет текста:</label>
-                <input type="color" name="text_color" value="#FF0000">
-            </div>
-
-            <div style="margin-top: 10px;">
-                <button type="submit">Генерировать</button>
-            </div>
+            <input type="text" name="title" placeholder="Название" required>
+            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
+            <button type="submit">Генерировать</button>
         </form>
 
         {% if qr_url %}
-            <div class="qr-preview" style="text-align:center; margin-bottom: 30px;">
-                <h3>Предпросмотр QR-кода:</h3>
-                <img src="{{ qr_url }}" alt="QR" style="max-width:300px; border:1px solid #ccc; padding:10px; background:white;">
+            <div class="qr-preview">
+                <img src="{{ qr_url }}" alt="QR">
             </div>
         {% endif %}
 
-        <div class="qr-list" style="margin-top: 30px;">
+        <div class="qr-list">
             <h2>Список сгенерированных QR-кодов</h2>
             {% if qr_list %}
-                <table style="width:100%; border-collapse: collapse;">
+                <table>
                     <thead>
                         <tr>
-                            <th style="border-bottom:1px solid #ccc; padding:8px;">Название</th>
-                            <th style="border-bottom:1px solid #ccc; padding:8px;">Дата</th>
-                            <th style="border-bottom:1px solid #ccc; padding:8px;">Файл</th>
-                            <th style="border-bottom:1px solid #ccc; padding:8px;">Действия</th>
+                            <th>Название</th>
+                            <th>Дата</th>
+                            <th>Файл</th>
+                            <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for qr in qr_list %}
                         <tr>
-                            <td style="padding:8px;">{{ qr[1] }}</td>
-                            <td style="padding:8px;">{{ qr[4] }}</td>
-                            <td style="padding:8px;"><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
-                            <td style="padding:8px;">
+                            <td>{{ qr[1] }}</td>
+                            <td>{{ qr[4] }}</td>
+                            <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
+                            <td>
                                 <a href="/delete_qr/{{ qr[0] }}" class="btn-delete">Удалить</a>
-                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">Скачать</a>
+                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">Поделиться</a>
                             </td>
                         </tr>
                         {% endfor %}
