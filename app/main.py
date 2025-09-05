@@ -71,35 +71,23 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
-    # Сохраняем запись в БД
-    async with aiosqlite.connect(DB_PATH) as db:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor = await db.execute(
-            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
-            (title, qrdata, filename, now)
-        )
-        await db.commit()
-        qr_id = cursor.lastrowid
+    # --- Генерируем QR ---
+    scan_url = f"{BASE_URL}/scan/{uuid.uuid4()}"  # или qr_id после вставки в БД
+    qr_img = qrcode.make(qrdata).convert("RGB")
 
-    # Генерируем ссылку для сканирования
-    scan_url = f"{BASE_URL}/scan/{qr_id}"
-    qr_img = qrcode.make(scan_url).convert("RGB")
-
-    # --- Функция для текста строго над QR с динамической шириной ---
+    # --- Функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-        from PIL import ImageDraw, ImageFont
-
         qr_width, qr_height = qr_img.size
-        font_size = 48  # стартовый размер
+        font_size = 48
         try:
             font = ImageFont.truetype(font_path, font_size)
         except IOError:
             font = ImageFont.load_default()
 
         draw = ImageDraw.Draw(qr_img)
-
-        # Автоуменьшение шрифта по ширине QR
         max_text_width = qr_width - 20
+
+        # Автоуменьшение шрифта
         while True:
             bbox = draw.textbbox((0, 0), title, font=font)
             if bbox[2] - bbox[0] <= max_text_width or font_size <= 14:
@@ -107,7 +95,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
             font_size -= 2
             font = ImageFont.truetype(font_path, font_size)
 
-        # Разбиваем текст на строки
+        # Разбиваем на строки
         words = title.split()
         lines = []
         line = ""
@@ -122,23 +110,22 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
                 line = test_line
         lines.append(line)
 
-        # Вычисляем максимальную ширину текста
-        text_widths = [draw.textbbox((0,0), l, font=font)[2] - draw.textbbox((0,0), l, font=font)[0] for l in lines]
+        # Высота и ширина итогового изображения
         text_height_total = sum([draw.textbbox((0,0), l, font=font)[3] - draw.textbbox((0,0), l, font=font)[1] + 5 for l in lines])
-        final_width = max(qr_width, max(text_widths) + 20)
+        final_width = max(qr_width, max([draw.textbbox((0,0), l, font=font)[2] - draw.textbbox((0,0), l, font=font)[0] for l in lines]) + 20)
         final_height = qr_height + text_height_total + 10
 
-        # Создаём холст
+        # Создаём финальное изображение
         final_img = Image.new("RGB", (final_width, final_height), "white")
         draw_final = ImageDraw.Draw(final_img)
 
-        # Рисуем текст с обводкой
+        # Рисуем текст
         y = 5
         for line in lines:
             bbox = draw_final.textbbox((0,0), line, font=font)
             text_width = bbox[2] - bbox[0]
             x = (final_width - text_width) // 2
-            # Обводка для читаемости
+            # Обводка
             for dx in [-1,0,1]:
                 for dy in [-1,0,1]:
                     if dx != 0 or dy != 0:
@@ -146,22 +133,41 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
             draw_final.text((x, y), line, font=font, fill="red")
             y += bbox[3] - bbox[1] + 5
 
-        # Вставляем QR-код под текст, по центру
+        # Вставляем QR-код под текст
         qr_x = (final_width - qr_width) // 2
         final_img.paste(qr_img, (qr_x, text_height_total + 10))
-
         return final_img
 
-    # --- Создаём финальное изображение ---
+    # --- Создаём запись в БД ---
+    async with aiosqlite.connect(DB_PATH) as db:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = await db.execute(
+            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
+            (title, qrdata, filename, now)
+        )
+        await db.commit()
+        qr_id = cursor.lastrowid
+
+    # --- Генерация финального изображения ---
+    scan_url = f"{BASE_URL}/scan/{qr_id}"
+    qr_img = qrcode.make(scan_url).convert("RGB")
     final_img = draw_title_above_qr_dynamic(qr_img, title)
     final_img.save(filepath)
     qr_url = f"/static/qr/{filename}"
 
-    # --- обновляем список QR ---
+    # --- Получаем обновлённый список QR ---
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
         qr_list = await cursor.fetchall()
 
+    # --- Возврат шаблона с новым QR ---
+    return templates.TemplateResponse("qr.html", {
+        "request": request,
+        "qr_url": qr_url,
+        "qr_title": title,
+        "qr_list": qr_list,
+        "active": "qr"
+    })
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
