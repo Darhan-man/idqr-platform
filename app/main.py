@@ -18,7 +18,7 @@ QR_FOLDER = "static/qr"
 FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "1990"
-BASE_URL = "https://idqr-platform.onrender.com"  # твой полный URL на Render
+BASE_URL = "https://idqr-platform.onrender.com"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
 
@@ -62,6 +62,28 @@ async def dashboard_qr(request: Request):
         "qr_list": qr_list,
         "qr_url": None,
         "qr_title": None,
+        "active": "qr"
+    })
+
+# --- ПРОСМОТР ОТДЕЛЬНОГО QR ---
+@app.get("/dashboard/qr/view/{qr_id}", response_class=HTMLResponse)
+async def view_qr(request: Request, qr_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+        qr_list = await cursor.fetchall()
+        cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
+        row = await cursor.fetchone()
+    if row:
+        qr_url = f"/static/qr/{row[3]}"
+        qr_title = row[1]
+    else:
+        qr_url = None
+        qr_title = None
+    return templates.TemplateResponse("qr.html", {
+        "request": request,
+        "qr_list": qr_list,
+        "qr_url": qr_url,
+        "qr_title": qr_title,
         "active": "qr"
     })
 
@@ -151,7 +173,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     final_img.save(filepath)
 
     # --- Redirect чтобы избежать дублирования при обновлении страницы ---
-    return RedirectResponse(url="/dashboard/qr", status_code=303)
+    return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
