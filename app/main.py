@@ -66,14 +66,11 @@ async def dashboard_qr(request: Request):
     })
 
 # --- Генерация QR ---
-@app.post("/generate_qr", response_class=HTMLResponse)
+@app.post("/generate_qr")
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
+    # Генерируем уникальное имя файла
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
-
-    # --- Генерируем QR ---
-    scan_url = f"{BASE_URL}/scan/{uuid.uuid4()}"  # или qr_id после вставки в БД
-    qr_img = qrcode.make(qrdata).convert("RGB")
 
     # --- Функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
@@ -119,13 +116,12 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         final_img = Image.new("RGB", (final_width, final_height), "white")
         draw_final = ImageDraw.Draw(final_img)
 
-        # Рисуем текст
+        # Рисуем текст с обводкой
         y = 5
         for line in lines:
             bbox = draw_final.textbbox((0,0), line, font=font)
             text_width = bbox[2] - bbox[0]
             x = (final_width - text_width) // 2
-            # Обводка
             for dx in [-1,0,1]:
                 for dy in [-1,0,1]:
                     if dx != 0 or dy != 0:
@@ -148,26 +144,14 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         await db.commit()
         qr_id = cursor.lastrowid
 
-    # --- Генерация финального изображения ---
+    # --- Генерация QR с правильной ссылкой ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
     final_img = draw_title_above_qr_dynamic(qr_img, title)
     final_img.save(filepath)
-    qr_url = f"/static/qr/{filename}"
 
-    # --- Получаем обновлённый список QR ---
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-        qr_list = await cursor.fetchall()
-
-    # --- Возврат шаблона с новым QR ---
-    return templates.TemplateResponse("qr.html", {
-        "request": request,
-        "qr_url": qr_url,
-        "qr_title": title,
-        "qr_list": qr_list,
-        "active": "qr"
-    })
+    # --- Redirect чтобы избежать дублирования при обновлении страницы ---
+    return RedirectResponse(url="/dashboard/qr", status_code=303)
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
