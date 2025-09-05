@@ -87,7 +87,12 @@ async def view_qr(request: Request, qr_id: int):
         "active": "qr"
     })
 
-# --- Генерация QR ---
+# --- Генерация QR (ФОРМА, GET) ---
+@app.get("/generate_qr", response_class=HTMLResponse)
+async def generate_qr_form(request: Request):
+    return templates.TemplateResponse("new_qr.html", {"request": request, "active": "qr"})
+
+# --- Генерация QR (СОЗДАНИЕ, POST) ---
 @app.post("/generate_qr")
 async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Form(...)):
     # Генерируем уникальное имя файла
@@ -174,6 +179,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Redirect чтобы избежать дублирования при обновлении страницы ---
     return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
+
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
