@@ -85,60 +85,50 @@ async def generate_qr(
         )
         await db.commit()
         qr_id = cursor.lastrowid
-# --- Генерация QR ---
-@app.post("/generate_qr", response_class=HTMLResponse)
-async def generate_qr(
-    request: Request,
-    qrdata: str = Form(...),
-    title: str = Form(...),
-    text_color: str = Form("#FF0000")  # цвет текста по умолчанию
-):
-    filename = f"{uuid.uuid4()}.png"
-    filepath = os.path.join(QR_FOLDER, filename)
-
-    # --- Сохраняем запись в БД ---
-    async with aiosqlite.connect(DB_PATH) as db:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor = await db.execute(
-            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
-            (title, qrdata, filename, now)
-        )
-        await db.commit()
-        qr_id = cursor.lastrowid
 
     # --- Генерация QR ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
     qr_img = qrcode.make(scan_url).convert("RGB")
 
-    # --- Функция для рисования текста с переносом и цветом ---
-    def draw_qr_with_text(qr_img, title, font_path=FONT_PATH, text_color=text_color, max_width=None):
-        try:
-            font = ImageFont.truetype(font_path, 32)
-        except IOError:
-            font = ImageFont.load_default()
-
-        draw_temp = ImageDraw.Draw(qr_img)
+    # --- Функция для рисования текста с переносом и автоуменьшением шрифта ---
+    def draw_qr_with_text(qr_img, title, font_path=FONT_PATH, text_color=text_color, max_width=None, max_font_size=32, min_font_size=12):
+        # Определяем макс ширину
         if max_width is None:
             max_width = qr_img.width - 20
 
-        # Разбиваем текст на строки по словам
-        words = title.split()
-        lines = []
-        line = ""
-        for word in words:
-            test_line = f"{line} {word}".strip()
-            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
-            w = bbox[2] - bbox[0]
-            if w <= max_width:
-                line = test_line
-            else:
-                if line:
-                    lines.append(line)
-                line = word
-        if line:
-            lines.append(line)
+        # Подбор шрифта с уменьшением размера, если текст слишком длинный
+        font_size = max_font_size
+        while font_size >= min_font_size:
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+            except IOError:
+                font = ImageFont.load_default()
+            # Проверяем, можно ли поместить текст в ширину QR
+            draw_temp = ImageDraw.Draw(qr_img)
+            words = title.split()
+            lines = []
+            line = ""
+            fits = True
+            for word in words:
+                test_line = f"{line} {word}".strip()
+                bbox = draw_temp.textbbox((0, 0), test_line, font=font)
+                w = bbox[2] - bbox[0]
+                if w <= max_width:
+                    line = test_line
+                else:
+                    if line:
+                        lines.append(line)
+                    line = word
+            if line:
+                lines.append(line)
 
-        # Вычисляем размеры нового холста
+            # Если строк слишком много и ширина всё ещё не помещается — уменьшаем шрифт
+            too_wide = any(draw_temp.textbbox((0,0), l, font=font)[2] - draw_temp.textbbox((0,0), l, font=font)[0] > max_width for l in lines)
+            if not too_wide:
+                break
+            font_size -= 2
+
+        # Вычисляем размеры холста
         line_heights = []
         line_widths = []
         for l in lines:
