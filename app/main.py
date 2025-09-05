@@ -85,6 +85,26 @@ async def generate_qr(
         )
         await db.commit()
         qr_id = cursor.lastrowid
+# --- Генерация QR ---
+@app.post("/generate_qr", response_class=HTMLResponse)
+async def generate_qr(
+    request: Request,
+    qrdata: str = Form(...),
+    title: str = Form(...),
+    text_color: str = Form("#FF0000")  # цвет текста по умолчанию
+):
+    filename = f"{uuid.uuid4()}.png"
+    filepath = os.path.join(QR_FOLDER, filename)
+
+    # --- Сохраняем запись в БД ---
+    async with aiosqlite.connect(DB_PATH) as db:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = await db.execute(
+            "INSERT INTO qr_codes (title, data, filename, created_at) VALUES (?, ?, ?, ?)",
+            (title, qrdata, filename, now)
+        )
+        await db.commit()
+        qr_id = cursor.lastrowid
 
     # --- Генерация QR ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
@@ -107,18 +127,26 @@ async def generate_qr(
         line = ""
         for word in words:
             test_line = f"{line} {word}".strip()
-            w, h = draw_temp.textsize(test_line, font=font)
+            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
+            w = bbox[2] - bbox[0]
             if w <= max_width:
                 line = test_line
             else:
-                lines.append(line)
+                if line:
+                    lines.append(line)
                 line = word
-        lines.append(line)
+        if line:
+            lines.append(line)
 
         # Вычисляем размеры нового холста
-        line_heights = [draw_temp.textsize(l, font=font)[1] for l in lines]
+        line_heights = []
+        line_widths = []
+        for l in lines:
+            bbox = draw_temp.textbbox((0, 0), l, font=font)
+            line_widths.append(bbox[2] - bbox[0])
+            line_heights.append(bbox[3] - bbox[1])
         text_height_total = sum(line_heights) + 5 * (len(lines) - 1)
-        new_width = max(qr_img.width, max([draw_temp.textsize(l, font=font)[0] for l in lines]) + 20)
+        new_width = max(qr_img.width, max(line_widths) + 20)
         new_height = qr_img.height + text_height_total + 20
 
         final_img = Image.new("RGB", (new_width, new_height), "white")
@@ -126,8 +154,10 @@ async def generate_qr(
 
         # Рисуем текст сверху
         current_y = 10
-        for line in lines:
-            w, h = draw.textsize(line, font=font)
+        for i, line in enumerate(lines):
+            bbox = draw.textbbox((0, 0), line, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
             draw.text(((new_width - w)//2, current_y), line, font=font, fill=text_color)
             current_y += h + 5
 
@@ -154,7 +184,6 @@ async def generate_qr(
         "qr_list": qr_list,
         "active": "qr"
     })
-
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
