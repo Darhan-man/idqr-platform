@@ -160,7 +160,8 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     # --- обновляем список QR ---
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-        qr_list = aw_
+        qr_list = await cursor.fetchall()
+
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
