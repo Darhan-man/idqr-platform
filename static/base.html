@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDQR Platform</title>
+
+    <!-- Стили -->
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <!-- Favicon (из логотипа IDEAQR в base64) -->
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABjklEQVR42mL8//8/AzQAisDIyMhISMjY2Njg5s2bX1hYWFhWVlaam5u/rKyscPjw4R92d3d/8PDw8Ly8/Ab///9fU1NTxz8rK+uOjo9XU1NRfQkJC5o+Pj9/Y2Fj29vafysnJib6WlpZfoqOjj7m5ufxHSkpy/vz57ysqKnoGNgYmPv3793vD19fXjYmNjfwYGBua+fv26Y2Zm/lVXV0/j4eHjLywsxANPSkoyj4uLY0ZGhu8hJSW5PzEx8QyQm5u7PTs7X3FwcPwfgJaWlp3JycmfSE9Pnzs4OHgfiIuLJ4GBgXVPnz59bmVl5R0QEHB9cnLyLy4u/sfExPwCqKiouE9MTPxXSkpyv7W1tfNzc3MYaGVl+QbW1dX9oaGh/bq6uv+6urq/fn5+gYGBhYuPj1+jo6P5BjY2Nq53N3UgAADzTFmmoEHSCEAAAAASUVORK5CYII=">
+
+    <!-- SEO -->
+    <meta name="description" content="IDQR Platform — панель управления QR-кодами, модулями и сервисами.">
+    <meta name="robots" content="index, follow">
+</head>
+<body>
+    <div class="navbar">
+        <h1>IDQR Platform</h1>
+        <nav>
+            <a href="/dashboard/qr" class="{{ 'active' if active == 'qr' else '' }}">📦 QR-Коды</a>
+            <a href="/dashboard/modules" class="{{ 'active' if active == 'modules' else '' }}">🧩 Модули</a>
+            <a href="/dashboard/users" class="{{ 'active' if active == 'users' else '' }}">👤 Пользователи</a>
+            <a href="/dashboard/stats" class="{{ 'active' if active == 'stats' else '' }}">📊 Статистика</a>
+            <a href="/dashboard/settings" class="{{ 'active' if active == 'settings' else '' }}">⚙️ Настройки</a>
+        </nav>
+    </div>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
