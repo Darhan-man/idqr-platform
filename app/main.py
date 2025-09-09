@@ -135,8 +135,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         full_bbox = draw_temp.multiline_textbbox((0, 0), '\n'.join(lines), font=font)
         total_text_height = full_bbox[3] - full_bbox[1]
 
-        if total_text_height + 60 + qr_height <= 
-        1200:
+        if total_text_height + 60 + qr_height <= 1200:
             break
         font_size -= 2
 
