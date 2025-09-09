@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель QR-кодов</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #7209b7;
+            --success: #06d6a0;
+            --danger: #ef476f;
+            --warning: #ffd166;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --light-gray: #e9ecef;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fb;
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 1.2rem 2rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar h1::before {
+            content: "⎘";
+            font-size: 1.5rem;
+        }
+
+        .navbar nav {
+            display: flex;
+            gap: 0.2rem;
+            flex-wrap: wrap;
+        }
+
+        .navbar a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar a:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .navbar a.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                align-items: start;
+            }
+            
+            .qr-form {
+                grid-column: 1;
+            }
+            
+            .qr-preview, .qr-list {
+                grid-column: 2;
+            }
+        }
+
+        .qr-form {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .qr-form:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .qr-form h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .qr-form h2::before {
+            content: "+";
+            font-size: 1.2rem;
+            background: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .qr-form input,
+        .qr-form textarea {
+            width: 100%;
+            padding: 0.9rem 1.2rem;
+            margin-bottom: 1.2rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .qr-form input:focus,
+        .qr-form textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+
+        .qr-form textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .qr-form button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.9rem 1.8rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .qr-form button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .qr-form button::before {
+            content: "⚡";
+        }
+
+        .qr-preview {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+
+        .qr-preview img {
+            max-width: 1000px;
+            border: 1px solid var(--light-gray);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .qr-list {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-top: 1rem;
+        }
+
+        .qr-list h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .qr-list h2::before {
+            content: "📋";
+            font-size: 1.2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+        }
+
+        thead {
+            background-color: #f8f9fa;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem;
+            font-weight: 600;
+            color: var(--gray);
+            border-bottom: 2px solid var(--light-gray);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .btn-delete, .btn-share {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .btn-delete {
+            background-color: #fff;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-delete:hover {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-share {
+            background-color: #fff;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            margin-left: 0.5rem;
+        }
+
+        .btn-share:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .qr-list p {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+            }
+            
+            .navbar nav {
+                gap: 0.5rem;
+                justify-content: center;
+            }
+            
+            .navbar a {
+                padding: 0.5rem 0.8rem;
+                font-size: 0.9rem;
+            }
+            
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>IDQR: Панель QR-Кодов</h1>
+        <nav>
+            <a href="/dashboard/qr" class="{{ 'active' if active == 'qr' else '' }}">📦 QR-Коды</a>
+            <a href="/dashboard/modules" class="{{ 'active' if active == 'modules' else '' }}">🧩 Модули</a>
+            <a href="/dashboard/users" class="{{ 'active' if active == 'users' else '' }}">👤 Пользователи</a>
+            <a href="/dashboard/stats" class="{{ 'active' if active == 'stats' else '' }}">📊 Статистика</a>
+            <a href="/dashboard/settings" class="{{ 'active' if active == 'settings' else '' }}">⚙️ Настройки</a>
+        </nav>
+    </div>
+
+    <div class="container">
+        <form method="post" action="/generate_qr" class="qr-form">
+            <h2>Создание нового QR-Кода</h2>
+            <input type="text" name="title" placeholder="Название" required>
+            <textarea name="qrdata" placeholder="Данные для кодирования" required></textarea>
+            <button type="submit">Генерировать</button>
+        </form>
+
+        {% if qr_url %}
+            <div class="qr-preview">
+                <img src="{{ qr_url }}" alt="QR">
+            </div>
+        {% endif %}
+
+        <div class="qr-list">
+            <h2>Список сгенерированных QR-кодов</h2>
+            {% if qr_list %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Дата</th>
+                            <th>Файл</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for qr in qr_list %}
+                        <tr>
+                            <td>{{ qr[1] }}</td>
+                            <td>{{ qr[4] }}</td>
+                            <td><a href="/static/qr/{{ qr[3] }}" target="_blank">Просмотр</a></td>
+                            <td>
+                                <a href="/delete_qr/{{ qr[0] }}" class="btn-delete">🗑️ Удалить</a>
+                                <a href="/static/qr/{{ qr[3] }}" download class="btn-share">📤 Поделиться</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>QR-коды ещё не созданы.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
