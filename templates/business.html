@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Категории: Бизнес и магазины</title>
+  <style>
+    :root {
+      --primary: #4361ee;
+      --primary-dark: #3a56d4;
+      --secondary: #7209b7;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --gray: #6c757d;
+      --border-radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --transition: all 0.3s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: #f5f7fb;
+      color: var(--dark);
+      line-height: 1.6;
+    }
+
+    .navbar {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 1.2rem 2rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .navbar h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar nav {
+      display: flex;
+      gap: 0.2rem;
+      flex-wrap: wrap;
+    }
+
+    .navbar a {
+      color: rgba(255, 255, 255, 0.85);
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar a:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+
+    .navbar a.active {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    h2 {
+      text-align: center;
+      margin: 2rem 0;
+      color: var(--primary);
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .module-button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1.2rem 1.5rem;
+      border-radius: var(--border-radius);
+      text-align: left;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+      border: none;
+      cursor: pointer;
+      gap: 0.5rem;
+    }
+
+    .module-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    }
+
+    .category-section {
+      margin-bottom: 3rem;
+    }
+
+    .category-title {
+      color: var(--secondary);
+      margin: 2rem 0 1rem 0;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--light);
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .navbar {
+        padding: 1rem;
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .navbar nav {
+        justify-content: center;
+      }
+      
+      .navbar a {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.9rem;
+      }
+      
+      .modules-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1>🏢 IDQR: Бизнес и магазины</h1>
+    <nav>
+      <a href="/dashboard/qr">📦 QR-Коды</a>
+      <a href="/dashboard/modules">🧩 Модули</a>
+      <a href="/dashboard/users">👤 Пользователи</a>
+      <a href="/dashboard/stats">📊 Статистика</a>
+      <a href="/dashboard/settings">⚙️ Настройки</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <h2>🏪 Категории: Бизнес и магазины</h2>
+
+    <div class="category-section">
+      <h3 class="category-title">🛒 Торговля</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">🛍 Продуктовые магазины</a>
+        <a href="#" class="module-button">👟 Одежда, обувь, аксессуары</a>
+        <a href="#" class="module-button">🏗️ Строительные товары</a>
+        <a href="#" class="module-button">🛋️ Мебельные магазины</a>
+        <a href="#" class="module-button">📱 Электроника и техника</a>
+        <a href="#" class="module-button">💊 Аптеки</a>
+        <a href="#" class="module-button">🔩 Автозапчасти</a>
+        <a href="#" class="module-button">🐾 Зоотовары</a>
+        <a href="#" class="module-button">🌸 Цветы и подарки</a>
+        <a href="#" class="module-button">📚 Книги и канцелярия</a>
+        <a href="#" class="module-button">💸 Second-hand и уценка</a>
+        <a href="#" class="module-button">🧼 Бытовая химия и товары для дома</a>
+        <a href="#" class="module-button">🛒 Интернет-магазины</a>
+        <a href="#" class="module-button">🧺 Рынки и лотки</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">💼 Бизнес-услуги</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">📄 Регистрация ИП/ТОО</a>
+        <a href="#" class="module-button">📊 Бухгалтерия и налоги</a>
+        <a href="#" class="module-button">⚖️ Юридические услуги</a>
+        <a href="#" class="module-button">🔐 Лицензии и сертификация</a>
+        <a href="#" class="module-button">🖨️ Печати и визитки</a>
+        <a href="#" class="module-button">🎓 Обучение предпринимателей</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">🚚 Логистика</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">🚚 Курьеры и доставка</a>
+        <a href="#" class="module-button">📦 Пункты выдачи (Ozon, WB, Kaspi)</a>
+        <a href="#" class="module-button">🏬 Склады и хранение</a>
+        <a href="#" class="module-button">🔖 Маркировка и QR-учёт</a>
+        <a href="#" class="module-button">📦 Упаковка и сборка</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">💰 Финансы</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">💳 Онлайн-кассы и эквайринг</a>
+        <a href="#" class="module-button">💸 Kaspi QR, FortePay</a>
+        <a href="#" class="module-button">🏦 Кредиты для бизнеса</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">📣 Реклама</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">📣 Реклама и продвижение</a>
+        <a href="#" class="module-button">🪧 Вывески и баннеры</a>
+        <a href="#" class="module-button">📤 Рассылки в мессенджерах</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">🏢 Недвижимость</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">🏢 Аренда помещений</a>
+        <a href="#" class="module-button">🛍️ Киоски и павильоны</a>
+        <a href="#" class="module-button">🛒 Места в ТЦ и рынках</a>
+        <a href="#" class="module-button">🪑 Торговое оборудование</a>
+      </div>
+    </div>
+
+    <div class="category-section">
+      <h3 class="category-title">🔍 Другое</h3>
+      <div class="modules-grid">
+        <a href="#" class="module-button">🤝 Франшизы</a>
+        <a href="#" class="module-button">🔍 Поиск персонала</a>
+        <a href="#" class="module-button">📲 Цифровые витрины и QR</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

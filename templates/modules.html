@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Модули</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #7209b7;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fb;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 1.2rem 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .navbar h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar nav {
+            display: flex;
+            gap: 0.2rem;
+            flex-wrap: wrap;
+        }
+
+        .navbar a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar a:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .navbar a.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .module-button {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 1.2rem 1.5rem;
+            border-radius: var(--border-radius);
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+            gap: 0.5rem;
+        }
+
+        .module-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+        }
+
+        .category-section {
+            margin-bottom: 3rem;
+        }
+
+        .category-title {
+            color: var(--secondary);
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--light);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+            }
+            
+            .navbar nav {
+                gap: 0.5rem;
+                justify-content: center;
+            }
+            
+            .navbar a {
+                padding: 0.5rem 0.8rem;
+                font-size: 0.9rem;
+            }
+            
+            .modules-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🧩 IDQR: Модули</h1>
+        <nav>
+            <a href="/dashboard/qr">📦 QR-Коды</a>
+            <a href="/dashboard/modules" class="active">🧩 Модули</a>
+            <a href="/dashboard/users">👤 Пользователи</a>
+            <a href="/dashboard/stats">📊 Статистика</a>
+            <a href="/dashboard/settings">⚙️ Настройки</a>
+        </nav>
+    </div>
+
+    <div class="container">
+        <h2>🎯 Выберите модуль для интеграции QR-кодов</h2>
+
+        <div class="modules-grid">
+            <a href="/dashboard/services" class="module-button">🧰 Услуги и быт</a>
+            <a href="/modules/clothing" class="module-button">👕 Одежда и мода</a>
+            <a href="/modules/transport" class="module-button">🚗 Транспорт и авто</a>
+            <a href="/modules/education" class="module-button">🏫 Образование и школы</a>
+            <a href="/modules/medicine" class="module-button">🏥 Медицина и здоровье</a>
+            <a href="/modules/construction" class="module-button">🛠️ Стройка и объекты</a>
+            <a href="/dashboard/business" class="module-button">🏢 Бизнес и магазины</a>
+            <a href="/modules/logistics" class="module-button">📦 Склад и логистика</a>
+            <a href="/modules/housing" class="module-button">🏡 ЖКХ и дома</a>
+            <a href="/modules/events" class="module-button">🎫 События и вход</a>
+            <a href="/modules/docs" class="module-button">📄 Документы и удостоверения</a>
+            <a href="/modules/gov" class="module-button">🧑‍💼 Госуслуги и учёт</a>
+            <a href="/modules/security" class="module-button">🚓 Безопасность и контроль</a>
+            <a href="/modules/ads" class="module-button">🌐 Реклама и аналитика</a>
+            <a href="/modules/courses" class="module-button">🎓 Курсы и тренинги</a>
+            <a href="/modules/gifts" class="module-button">🎁 Подарки и сервис</a>
+            <a href="/modules/branding" class="module-button">🏷️ Маркетинг и бренды</a>
+            <a href="/modules/payment" class="module-button">🧾 Квитанции и оплата</a>
+        </div>
+    </div>
+</body>
+</html>

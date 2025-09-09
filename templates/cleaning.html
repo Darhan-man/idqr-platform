@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Уборка и гигиена</title>
+  <style>
+    :root {
+      --primary: #4361ee;
+      --primary-dark: #3a56d4;
+      --success: #06d6a0;
+      --success-dark: #05b989;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --gray: #6c757d;
+      --border-radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --transition: all 0.3s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: #f5f7fb;
+      color: var(--dark);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .back-button {
+      color: white;
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.15);
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .back-button:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateX(-2px);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--success), var(--success-dark));
+      color: white;
+      padding: 1.2rem 1.5rem;
+      border-radius: var(--border-radius);
+      text-align: left;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      position: relative;
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: var(--shadow);
+    }
+
+    .btn::after {
+      content: "→";
+      position: absolute;
+      right: 1.2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.2rem;
+      opacity: 0.8;
+      transition: var(--transition);
+    }
+
+    .btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn:hover::after {
+      right: 1rem;
+      opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+      
+      .back-button {
+        align-self: center;
+      }
+      
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .btn {
+        padding: 1rem 1.2rem;
+        font-size: 0.9rem;
+      }
+      
+      .container {
+        padding: 0 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span style="font-size: 1.5rem; font-weight: 700;">IDQR</span>
+    <a href="/dashboard/services" class="back-button">← Назад к услугам</a>
+  </div>
+
+  <div class="container">
+    <h1>🧼 Уборка и гигиена</h1>
+
+    <div class="grid">
+      <div class="btn">🚪 Вынос мусора от двери</div>
+      <div class="btn">🏢 Уборка офисов</div>
+      <div class="btn">🏬 Уборка магазинов</div>
+      <div class="btn">🏭 Уборка складов</div>
+      <div class="btn">🛏 Уборка гостиниц</div>
+      <div class="btn">🚧 После стройки</div>
+      <div class="btn">🏘 После аренды</div>
+      <div class="btn">🧴 Дезинфекция</div>
+      <div class="btn">💨 Озонирование</div>
+      <div class="btn">🌸 Ароматизация</div>
+      <div class="btn">🌀 Чистка вентиляции</div>
+      <div class="btn">🛋 Мягкая мебель</div>
+      <div class="btn">🪑 Диваны и кресла</div>
+      <div class="btn">🛏 Матрасы</div>
+      <div class="btn">🚗 Салон авто</div>
+      <div class="btn">🧼 Мытьё окон</div>
+      <div class="btn">🪟 После ремонта</div>
+      <div class="btn">🧽 Высотная мойка</div>
+      <div class="btn">🛍 Мойка витрин</div>
+      <div class="btn">❄ Уборка снега</div>
+      <div class="btn">🏕 Уборка наделов</div>
+      <div class="btn">🍂 Сбор листвы</div>
+      <div class="btn">🛣 Тротуары</div>
+      <div class="btn">🏘 Парковки и дворы</div>
+      <div class="btn">🚪 Уборка подъездов</div>
+      <div class="btn">🧊 Обработка от гололёда</div>
+    </div>
+  </div>
+</body>
+</html>

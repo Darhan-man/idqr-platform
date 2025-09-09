@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDQR: Услуги и быт</title>
+  <style>
+    :root {
+      --primary: #4361ee;
+      --primary-dark: #3a56d4;
+      --secondary: #7209b7;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --gray: #6c757d;
+      --border-radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --transition: all 0.3s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: #f5f7fb;
+      color: var(--dark);
+      line-height: 1.6;
+    }
+
+    .navbar {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 1.2rem 2rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .navbar h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar nav {
+      display: flex;
+      gap: 0.2rem;
+      flex-wrap: wrap;
+    }
+
+    .navbar a {
+      color: rgba(255, 255, 255, 0.85);
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar a:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    h2 {
+      text-align: center;
+      margin: 2rem 0;
+      color: var(--primary);
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .module-button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1.2rem 1.5rem;
+      border-radius: var(--border-radius);
+      text-align: left;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+      border: none;
+      cursor: pointer;
+      gap: 0.5rem;
+    }
+
+    .module-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    }
+
+    @media (max-width: 768px) {
+      .navbar {
+        padding: 1rem;
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .navbar nav {
+        justify-content: center;
+      }
+      
+      .navbar a {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.9rem;
+      }
+      
+      .modules-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1>🧰 IDQR: Услуги и быт</h1>
+    <nav>
+      <a href="/dashboard/qr">📦 QR-Коды</a>
+      <a href="/dashboard/modules">🧩 Модули</a>
+      <a href="/dashboard/users">👤 Пользователи</a>
+      <a href="/dashboard/stats">📊 Статистика</a>
+      <a href="/dashboard/settings">⚙️ Настройки</a>
+    </nav>
+  </div>
+
+  <div class="container">
+    <h2>🏠 Категории: Услуги и быт</h2>
+    <div class="modules-grid">
+      <a href="/dashboard/cleaning" class="module-button">🧼 Уборка и гигиена</a>
+      <a href="#" class="module-button">🔧 Ремонт и техника</a>
+      <a href="#" class="module-button">🚗 Автоуслуги</a>
+      <a href="#" class="module-button">💄 Красота</a>
+      <a href="#" class="module-button">🏥 Медицина</a>
+      <a href="#" class="module-button">👩‍⚕️ Персонал</a>
+      <a href="#" class="module-button">📚 Образование</a>
+      <a href="#" class="module-button">🐾 Животные</a>
+      <a href="#" class="module-button">📋 Юридические и госуслуги</a>
+      <a href="#" class="module-button">💼 Финансы</a>
+      <a href="#" class="module-button">💻 IT и креатив</a>
+      <a href="#" class="module-button">🧵 Одежда и текстиль</a>
+      <a href="#" class="module-button">🕯️ Религиозные и ритуальные услуги</a>
+    </div>
+  </div>
+</body>
+</html>
