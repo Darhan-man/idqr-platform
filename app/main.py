@@ -101,17 +101,15 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Новая, более надежная функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-     qr_width, qr_height = qr_img.size
+    qr_width, qr_height = qr_img.size
 
     if not title.strip():
         return qr_img
 
-    # Начинаем с адекватного размера шрифта
     font_size = 35
-    max_text_width = qr_width - 40  # отступы по бокам
+    max_text_width = qr_width - 40
     draw_temp = ImageDraw.Draw(Image.new('RGB', (1, 1)))
 
-    # Подбор шрифта и разбивка текста на строки
     while font_size > 10:
         try:
             font = ImageFont.truetype(font_path, font_size)
@@ -137,16 +135,14 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         full_bbox = draw_temp.multiline_textbbox((0, 0), '\n'.join(lines), font=font)
         total_text_height = full_bbox[3] - full_bbox[1]
 
-        # Проверка, чтобы текст + QR не превышали разумную высоту
-        if total_text_height + 60 + qr_height <= 1200:
+        if total_text_height + 60 + qr_height <= 
+        1200:
             break
         font_size -= 2
 
-    # Если шрифт не определился — fallback
     if font is None:
         font = ImageFont.load_default()
 
-    # Финальные размеры
     top_padding = 30
     bottom_padding = 30
     line_spacing = 10
@@ -154,7 +150,6 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     final_img = Image.new("RGB", (qr_width, final_height), "white")
     draw_final = ImageDraw.Draw(final_img)
 
-    # Рисуем текст с обводкой
     y = top_padding
     for line in lines:
         line_bbox = draw_final.textbbox((0, 0), line, font=font)
@@ -167,14 +162,11 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         draw_final.text((x, y), line, font=font, fill="red")
         y += (line_bbox[3] - line_bbox[1]) + line_spacing
 
-    # Вставляем QR-код
     qr_x = (qr_width - qr_img.size[0]) // 2
-    qr_y = final_height - qr_height - bottom_padding
-    final_img.paste(qr_img, (qr_x, qr_y))
+    qr_y = y + bottom_padding
+    final_img.paste(qr_img, (qr_x, int(qr_y)))
 
     return final_img
-
-        
 
     # --- Создаём запись в БД ---
     async with aiosqlite.connect(DB_PATH) as db:
