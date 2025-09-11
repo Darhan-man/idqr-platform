@@ -101,28 +101,22 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-          qr_width, qr_height = qr_img.size
+        qr_width, qr_height = qr_img.size
     
     # Создаем временное изображение для расчетов
     temp_img = Image.new('RGB', (1, 1))
     temp_draw = ImageDraw.Draw(temp_img)
     
+    # Настройки шрифта
     font_size = 48
     try:
         font = ImageFont.truetype(font_path, font_size)
     except IOError:
+        # Если шрифт не найден, используем стандартный
         font = ImageFont.load_default()
+        font_size = 20  # Уменьшаем размер для стандартного шрифта
 
-    max_text_width = qr_width - 20
-
-    # Автоматическое уменьшение размера шрифта
-    while True:
-        bbox = temp_draw.textbbox((0, 0), title, font=font)
-        text_width = bbox[2] - bbox[0]
-        if text_width <= max_text_width or font_size <= 14:
-            break
-        font_size -= 2
-        font = ImageFont.truetype(font_path, font_size)
+    max_text_width = qr_width - 40  # Увеличиваем отступы
 
     # Разбиваем текст на строки
     words = title.split()
@@ -130,7 +124,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     current_line = ""
     
     for word in words:
-        test_line = f"{current_line} {word}".strip()
+        test_line = f"{current_line} {word}".strip() if current_line else word
         bbox = temp_draw.textbbox((0, 0), test_line, font=font)
         text_width = bbox[2] - bbox[0]
         
@@ -146,29 +140,26 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # Рассчитываем высоту текста
     line_heights = []
-    for line in lines:
-        bbox = temp_draw.textbbox((0, 0), line, font=font)
-        line_heights.append(bbox[3] - bbox[1])
-    
-    text_height_total = sum(line_heights) + (len(lines) - 1) * 5
-    
-    # Определяем максимальную ширину текста
     max_line_width = 0
     for line in lines:
         bbox = temp_draw.textbbox((0, 0), line, font=font)
+        line_height = bbox[3] - bbox[1]
         line_width = bbox[2] - bbox[0]
+        line_heights.append(line_height)
         if line_width > max_line_width:
             max_line_width = line_width
     
-    # Создаем финальное изображение с достаточным местом для текста и QR-кода
-    final_width = max(qr_width, max_line_width + 20)
-    final_height = qr_height + text_height_total + 30
+    text_height_total = sum(line_heights) + (len(lines) - 1) * 10  # Увеличиваем межстрочный интервал
+    
+    # Создаем финальное изображение
+    final_width = max(qr_width, max_line_width + 40)  # Увеличиваем отступы
+    final_height = qr_height + text_height_total + 40  # Увеличиваем отступы
     
     final_img = Image.new("RGB", (final_width, final_height), "white")
     draw_final = ImageDraw.Draw(final_img)
     
     # Рисуем текст
-    y = 10
+    y = 20  # Увеличиваем начальный отступ
     for i, line in enumerate(lines):
         bbox = draw_final.textbbox((0, 0), line, font=font)
         text_width = bbox[2] - bbox[0]
@@ -182,11 +173,11 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         
         # Рисуем основной текст
         draw_final.text((x, y), line, font=font, fill="red")
-        y += line_heights[i] + 5
+        y += line_heights[i] + 10  # Увеличиваем межстрочный интервал
     
     # Вставляем QR-код под текст
     qr_x = (final_width - qr_width) // 2
-    final_img.paste(qr_img, (qr_x, text_height_total + 15))
+    final_img.paste(qr_img, (qr_x, text_height_total + 30))  # Увеличиваем отступ
     
     return final_img
 
