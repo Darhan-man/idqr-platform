@@ -99,82 +99,67 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     filename = f"{uuid.uuid4()}.png"
     filepath = os.path.join(QR_FOLDER, filename)
 
-    # --- Новая, более надежная функция для текста над QR ---
+    # --- Функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-         qr_width, qr_height = qr_img.size
-
-    if not title.strip():
-        return qr_img
-
-    # Начинаем с адекватного размера шрифта
-    font_size = 35
-    max_text_width = qr_width - 40  # отступы по бокам
-    draw_temp = ImageDraw.Draw(Image.new('RGB', (1, 1)))
-
-    # Подбор шрифта и разбивка текста на строки
-    while font_size > 10:
+        qr_width, qr_height = qr_img.size
+        font_size = 48
         try:
             font = ImageFont.truetype(font_path, font_size)
         except IOError:
             font = ImageFont.load_default()
-            break
 
+        draw = ImageDraw.Draw(qr_img)
+        max_text_width = qr_width - 20
+
+        # Автоуменьшение шрифта
+        while True:
+            bbox = draw.textbbox((0, 0), title, font=font)
+            if bbox[2] - bbox[0] <= max_text_width or font_size <= 14:
+                break
+            font_size -= 2
+            font = ImageFont.truetype(font_path, font_size)
+
+        # Разбиваем на строки
         words = title.split()
         lines = []
-        current_line = ""
+        line = ""
         for word in words:
-            test_line = f"{current_line} {word}".strip()
-            bbox = draw_temp.textbbox((0, 0), test_line, font=font)
-            if bbox[2] - bbox[0] > max_text_width:
-                if current_line:
-                    lines.append(current_line)
-                current_line = word
+            test_line = f"{line} {word}".strip()
+            bbox = draw.textbbox((0,0), test_line, font=font)
+            if bbox[2] > max_text_width:
+                if line:
+                    lines.append(line)
+                line = word
             else:
-                current_line = test_line
-        if current_line:
-            lines.append(current_line)
+                line = test_line
+        lines.append(line)
 
-        full_bbox = draw_temp.multiline_textbbox((0, 0), '\n'.join(lines), font=font)
-        total_text_height = full_bbox[3] - full_bbox[1]
+        # Высота и ширина итогового изображения
+        text_height_total = sum([draw.textbbox((0,0), l, font=font)[3] - draw.textbbox((0,0), l, font=font)[1] + 5 for l in lines])
+        final_width = max(qr_width, max([draw.textbbox((0,0), l, font=font)[2] - draw.textbbox((0,0), l, font=font)[0] for l in lines]) + 20)
+        final_height = qr_height + text_height_total + 10
 
-        # Проверка, чтобы текст + QR не превышали разумную высоту
-        if total_text_height + 60 + qr_height <= 1200:
-            break
-        font_size -= 2
+        # Создаём финальное изображение
+        final_img = Image.new("RGB", (final_width, final_height), "white")
+        draw_final = ImageDraw.Draw(final_img)
 
-    # Если шрифт не определился — fallback
-    if font is None:
-        font = ImageFont.load_default()
+        # Рисуем текст с обводкой
+        y = 5
+        for line in lines:
+            bbox = draw_final.textbbox((0,0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (final_width - text_width) // 2
+            for dx in [-1,0,1]:
+                for dy in [-1,0,1]:
+                    if dx != 0 or dy != 0:
+                        draw_final.text((x+dx, y+dy), line, font=font, fill="black")
+            draw_final.text((x, y), line, font=font, fill="red")
+            y += bbox[3] - bbox[1] + 5
 
-    # Финальные размеры
-    top_padding = 20
-    bottom_padding = 20
-    line_spacing = 10
-    final_height = qr_height + total_text_height + top_padding + bottom_padding
-    final_img = Image.new("RGB", (qr_width, final_height), "white")
-    draw_final = ImageDraw.Draw(final_img)
-
-    # Рисуем текст с обводкой
-    y = top_padding
-    for line in lines:
-        line_bbox = draw_final.textbbox((0, 0), line, font=font)
-        x = (qr_width - (line_bbox[2] - line_bbox[0])) // 2
-
-        for dx in range(-2, 3):
-            for dy in range(-2, 3):
-                if dx != 0 or dy != 0:
-                    draw_final.text((x + dx, y + dy), line, font=font, fill="black")
-        draw_final.text((x, y), line, font=font, fill="red")
-        y += (line_bbox[3] - line_bbox[1]) + line_spacing
-
-    # Вставляем QR-код
-    qr_x = (qr_width - qr_img.size[0]) // 2
-    qr_y = final_height - qr_height - bottom_padding
-    final_img.paste(qr_img, (qr_x, qr_y))
-
-    return final_img
-
-        
+        # Вставляем QR-код под текст
+        qr_x = (final_width - qr_width) // 2
+        final_img.paste(qr_img, (qr_x, text_height_total + 10))
+        return final_img
 
     # --- Создаём запись в БД ---
     async with aiosqlite.connect(DB_PATH) as db:
@@ -188,16 +173,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
 
     # --- Генерация QR с правильной ссылкой ---
     scan_url = f"{BASE_URL}/scan/{qr_id}"
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=5,
-        border=1,
-    )
-    qr.add_data(scan_url)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    
+    qr_img = qrcode.make(scan_url).convert("RGB")
     final_img = draw_title_above_qr_dynamic(qr_img, title)
     final_img.save(filepath)
 
@@ -279,4 +255,3 @@ async def business_module(request: Request):
 @app.get("/dashboard/cleaning", response_class=HTMLResponse)
 async def cleaning_services(request: Request):
     return templates.TemplateResponse("cleaning.html", {"request": request})
-    
