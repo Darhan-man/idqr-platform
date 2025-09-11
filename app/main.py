@@ -102,14 +102,14 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
     # --- Функция для текста над QR ---
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
         qr_width, qr_height = qr_img.size
-        font_size = 48
+        font_size = 20
         try:
             font = ImageFont.truetype(font_path, font_size)
         except IOError:
             font = ImageFont.load_default()
 
         draw = ImageDraw.Draw(qr_img)
-        max_text_width = qr_width - 15
+        max_text_width = qr_width - 10
 
         # Автоуменьшение шрифта
         while True:
@@ -137,7 +137,7 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
         # Высота и ширина итогового изображения
         text_height_total = sum([draw.textbbox((0,0), l, font=font)[3] - draw.textbbox((0,0), l, font=font)[1] + 5 for l in lines])
         final_width = max(qr_width, max([draw.textbbox((0,0), l, font=font)[2] - draw.textbbox((0,0), l, font=font)[0] for l in lines]) + 20)
-        final_height = qr_height + text_height_total + 2
+        final_height = qr_height + text_height_total
 
         # Создаём финальное изображение
         final_img = Image.new("RGB", (final_width, final_height), "white")
