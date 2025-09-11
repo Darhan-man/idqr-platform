@@ -43,7 +43,7 @@ async def startup():
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-        qr_width, qr_height = qr_img.size
+    qr_width, qr_height = qr_img.size
     font_size = 48
     try:
         font = ImageFont.truetype(font_path, font_size)
