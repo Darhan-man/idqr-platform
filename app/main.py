@@ -114,7 +114,7 @@ def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
     def draw_title_above_qr_dynamic(qr_img, title, font_path=FONT_PATH):
-    qr_width, qr_height = qr_img.size
+        qr_width, qr_height = qr_img.size
     font_size = 48
     try:
         font = ImageFont.truetype(font_path, font_size)
