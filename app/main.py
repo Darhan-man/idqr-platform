@@ -17,7 +17,7 @@ templates = Jinja2Templates(directory="templates")
 QR_FOLDER = "static/qr"
 FONT_PATH = "static/fonts/RobotoSlab-Bold.ttf"
 DB_PATH = "qr_data.db"
-ADMIN_CODE = "1990"
+ADMIN_CODE = "admin1990"
 BASE_URL = "https://idqr-platform.onrender.com"
 
 os.makedirs(QR_FOLDER, exist_ok=True)
