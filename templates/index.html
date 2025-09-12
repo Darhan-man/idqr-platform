@@ -3,152 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR — Вход</title>
+    <title>IDQR — Современный вход в систему</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #4361ee;
-            --primary-dark: #3a56d4;
-            --secondary: #7209b7;
-            --light: #f8f9fa;
-            --dark: #212529;
-            --gray: #6c757d;
-            --danger: #ef476f;
-            --border-radius: 12px;
-            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            --transition: all 0.3s ease;
+            /* Светлая тема (по умолчанию) */
+            --primary: #6C63FF;
+            --primary-dark: #564FD8;
+            --secondary: #FF64B4;
+            --accent: #6DDFFF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+        }
+
+        [data-theme="dark"] {
+            /* Тёмная тема */
+            --primary: #817BFF;
+            --primary-dark: #6C63FF;
+            --secondary: #FF7AC6;
+            --accent: #81E6FF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fb 0%, #e4e8f0 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
-            color: var(--dark);
+            color: var(--text-primary);
             line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            transition: background 0.5s ease;
         }
 
         .navbar {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 1.2rem 2rem;
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--text-primary);
+            padding: 1.2rem 2.5rem;
             box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
         }
 
         .navbar h1 {
-            font-size: 1.8rem;
+            font-size: 1.6rem;
             font-weight: 700;
-            margin-bottom: 1.2rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .navbar nav {
             display: flex;
-            gap: 0.2rem;
+            gap: 0.5rem;
             flex-wrap: wrap;
         }
 
         .navbar a.disabled {
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-secondary);
             text-decoration: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 8px;
+            padding: 0.7rem 1.2rem;
+            border-radius: 12px;
             font-weight: 500;
             display: flex;
             align-items: center;
             gap: 0.5rem;
             cursor: not-allowed;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
 
-        .container {
-            max-width: 400px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
+        .navbar a.disabled::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.4s ease;
         }
 
-        .login-card {
-            background: white;
-            padding: 2.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
+        .navbar a.disabled:hover::before {
+            left: 100%;
         }
 
-        .login-card:hover {
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
+            position: absolute;
+            right: 2.5rem;
+            top: 50%;
+            transform: translateY(-50%);
         }
 
-        h2 {
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-            font-size: 1.8rem;
+        .theme-switch {
+            display: inline-block;
+            position: relative;
+            width: 60px;
+            height: 34px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider i {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: white;
+        }
+
+        .slider .sun {
+            left: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slider .moon {
+            right: 8px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        input:checked + .slider .sun {
+            opacity: 1;
+        }
+
+        input:checked + .slider .moon {
+            opacity: 0;
+        }
+
+        .main-container {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            padding: 2rem;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, var(--primary), transparent);
+            opacity: 0.05;
+            transform: rotate(45deg);
+            z-index: 0;
+            animation: shimmer 8s ease infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: rotate(45deg) translateX(-50%);
+            }
+            100% {
+                transform: rotate(45deg) translateX(50%);
+            }
+        }
+
+        .login-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-card:hover {
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
+        }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         form {
             display: flex;
             flex-direction: column;
-            gap: 1.2rem;
+            gap: 1.5rem;
+        }
+
+        .input-group {
+            position: relative;
         }
 
         input {
-            padding: 1rem 1.2rem;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
+            padding: 1.2rem 1.5rem;
+            border: 1px solid rgba(139, 139, 159, 0.2);
+            border-radius: 12px;
             font-size: 1rem;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             width: 100%;
+            background: var(--input-bg);
+            color: var(--text-primary);
         }
 
         input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+            background: var(--input-bg);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
         }
 
         button {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             border: none;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
+            padding: 1.2rem 2rem;
+            border-radius: 12px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: all 0.5s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3);
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        .error {
+            color: var(--error);
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 107, 147, 0.1);
+            border-radius: 12px;
+            font-weight: 500;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
         }
 
-        button:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
         }
 
-        .error {
-            color: var(--danger);
-            margin-top: 1rem;
-            padding: 0.8rem;
-            background: rgba(239, 71, 111, 0.1);
-            border-radius: 6px;
-            font-weight: 500;
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0.1;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) rotate(0deg);
+            }
+            100% {
+                transform: translateY(-100vh) rotate(360deg);
+            }
         }
 
         @media (max-width: 768px) {
             .navbar {
                 padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
             }
             
             .navbar nav {
@@ -157,51 +412,151 @@
             }
             
             .navbar a.disabled {
-                padding: 0.5rem 0.8rem;
+                padding: 0.6rem 1rem;
                 font-size: 0.9rem;
+            }
+            
+            .theme-switch-wrapper {
+                position: relative;
+                right: auto;
+                top: auto;
+                transform: none;
+                margin-top: 1rem;
             }
             
             .login-card {
                 padding: 2rem 1.5rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .navbar h1 {
-                font-size: 1.5rem;
             }
             
             h2 {
                 font-size: 1.5rem;
             }
         }
+
+        @media (max-width: 480px) {
+            .navbar h1 {
+                font-size: 1.4rem;
+            }
+            
+            h2 {
+                font-size: 1.4rem;
+            }
+            
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .theme-switch {
+                width: 50px;
+                height: 28px;
+            }
+            
+            .slider:before {
+                height: 20px;
+                width: 20px;
+            }
+            
+            input:checked + .slider:before {
+                transform: translateX(22px);
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="particles" id="particles"></div>
+    
     <div class="navbar">
-        <h1>🔐 IDQR: Вход в систему</h1>
+        <h1><i class="fas fa-qrcode"></i> IDQR: Вход в систему</h1>
         <nav>
-            <a href="#" class="disabled">📦 QR-Коды</a>
-            <a href="#" class="disabled">🧩 Модули</a>
-            <a href="#" class="disabled">👤 Пользователи</a>
-            <a href="#" class="disabled">📊 Статистика</a>
-            <a href="#" class="disabled">⚙️ Настройки</a>
+            <a href="#" class="disabled"><i class="fas fa-qrcode"></i> QR-Коды</a>
+            <a href="#" class="disabled"><i class="fas fa-puzzle-piece"></i> Модули</a>
+            <a href="#" class="disabled"><i class="fas fa-user"></i> Пользователи</a>
+            <a href="#" class="disabled"><i class="fas fa-chart-bar"></i> Статистика</a>
+            <a href="#" class="disabled"><i class="fas fa-cog"></i> Настройки</a>
         </nav>
+        
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" />
+                <div class="slider">
+                    <i class="fas fa-sun sun"></i>
+                    <i class="fas fa-moon moon"></i>
+                </div>
+            </label>
+        </div>
     </div>
 
-    <div class="container">
+    <div class="main-container">
         <div class="login-card">
-            <h2>🔐 Авторизация администратора</h2>
+            <h2><span class="logo"><i class="fas fa-key"></i></span> Авторизация администратора</h2>
 
-            {% if error %}
-                <p class="error">{{ error }}</p>
-            {% endif %}
+            <div class="error" style="display: none;"><i class="fas fa-exclamation-circle"></i> Неверный код доступа</div>
 
-            <form method="post" action="/login">
-                <input type="password" name="code" placeholder="Введите код доступа" required>
-                <button type="submit">🚀 Войти в систему</button>
+            <form id="login-form">
+                <div class="input-group">
+                    <input type="password" name="code" placeholder="Введите код доступа" required>
+                </div>
+                <button type="submit"><i class="fas fa-rocket"></i> Войти в систему</button>
             </form>
         </div>
     </div>
+
+    <script>
+        // Создание частиц для фона
+        document.addEventListener('DOMContentLoaded', function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const size = Math.random() * 50 + 10;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                particle.style.animationDelay = `-${Math.random() * 20}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
+            
+            // Обработка переключения темы
+            const toggleSwitch = document.querySelector('#checkbox');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggleSwitch.checked = true;
+            }
+            
+            function switchTheme(e) {
+                if (e.target.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }    
+            }
+            
+            toggleSwitch.addEventListener('change', switchTheme, false);
+            
+            // Обработка формы входа
+            document.getElementById('login-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const errorDiv = document.querySelector('.error');
+                errorDiv.style.display = 'flex';
+                
+                // Симуляция проверки кода доступа
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            });
+        });
+    </script>
 </body>
 </html>

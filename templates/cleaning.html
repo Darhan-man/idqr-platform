@@ -3,63 +3,207 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Уборка и гигиена</title>
+  <title>IDQR: Уборка и гигиена</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --primary: #4361ee;
-      --primary-dark: #3a56d4;
-      --success: #06d6a0;
-      --success-dark: #05b989;
-      --light: #f8f9fa;
-      --dark: #212529;
-      --gray: #6c757d;
-      --border-radius: 12px;
-      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      --transition: all 0.3s ease;
+      /* Светлая тема (по умолчанию) */
+      --primary: #6C63FF;
+      --primary-dark: #564FD8;
+      --secondary: #FF64B4;
+      --accent: #6DDFFF;
+      --light: #F8FAFF;
+      --dark: #1E1E2E;
+      --gray: #8B8B9F;
+      --success: #00C9A7;
+      --error: #FF6B93;
+      --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --card-border: rgba(255, 255, 255, 0.2);
+      --text-primary: #1E1E2E;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(255, 255, 255, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.2);
+      --input-bg: rgba(255, 255, 255, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+      --border-radius: 16px;
+      --border-radius-sm: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    [data-theme="dark"] {
+      /* Тёмная тема */
+      --primary: #817BFF;
+      --primary-dark: #6C63FF;
+      --secondary: #FF7AC6;
+      --accent: #81E6FF;
+      --light: #252536;
+      --dark: #F0F0F0;
+      --gray: #7B7B8F;
+      --success: #00D6B3;
+      --error: #FF7A9E;
+      --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+      --card-bg: rgba(30, 30, 46, 0.9);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-primary: #F0F0F0;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(30, 30, 46, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.1);
+      --input-bg: rgba(30, 30, 46, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
     }
 
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
     }
 
     body {
-      background: #f5f7fb;
-      color: var(--dark);
+      background: var(--bg-gradient);
+      color: var(--text-primary);
       line-height: 1.6;
+      min-height: 100vh;
     }
 
     .header {
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: white;
-      padding: 1.2rem 2rem;
+      background: var(--nav-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: var(--text-primary);
+      padding: 1.2rem 2.5rem;
+      box-shadow: var(--shadow);
+      border-bottom: 1px solid var(--nav-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: var(--shadow);
       position: sticky;
       top: 0;
       z-index: 100;
     }
 
+    .header span {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
     .back-button {
-      color: white;
+      color: var(--text-primary);
       text-decoration: none;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
+      padding: 0.7rem 1.2rem;
+      border-radius: var(--border-radius-sm);
       font-weight: 500;
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(108, 99, 255, 0.1);
       transition: var(--transition);
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .back-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: var(--transition);
     }
 
     .back-button:hover {
-      background: rgba(255, 255, 255, 0.25);
-      transform: translateX(-2px);
+      background: rgba(108, 99, 255, 0.2);
+    }
+
+    .back-button:hover::before {
+      left: 100%;
+    }
+
+    .theme-switch-wrapper {
+      display: flex;
+      align-items: center;
+    }
+
+    .theme-switch {
+      display: inline-block;
+      position: relative;
+      width: 60px;
+      height: 34px;
+    }
+
+    .theme-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--gray);
+      transition: .4s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
+    .slider i {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: white;
+    }
+
+    .slider .sun {
+      left: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .slider .moon {
+      right: 8px;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    input:checked + .slider .sun {
+      opacity: 1;
+    }
+
+    input:checked + .slider .moon {
+      opacity: 0;
     }
 
     .container {
@@ -70,40 +214,61 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 2rem;
-      font-size: 2rem;
-      color: var(--primary);
+      margin-bottom: 2.5rem;
+      font-size: 2.2rem;
+      color: var(--text-primary);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      gap: 0.75rem;
+      font-weight: 700;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
     }
 
     .btn {
-      background: linear-gradient(135deg, var(--success), var(--success-dark));
-      color: white;
-      padding: 1.2rem 1.5rem;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text-primary);
+      padding: 1.5rem;
       border-radius: var(--border-radius);
       text-align: left;
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: 600;
       border: none;
       position: relative;
       cursor: pointer;
       transition: var(--transition);
       box-shadow: var(--shadow);
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, var(--success), var(--success-dark));
+      opacity: 0;
+      transition: var(--transition);
+      z-index: -1;
     }
 
     .btn::after {
       content: "→";
       position: absolute;
-      right: 1.2rem;
+      right: 1.5rem;
       top: 50%;
       transform: translateY(-50%);
       font-size: 1.2rem;
@@ -112,13 +277,45 @@
     }
 
     .btn:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+      color: white;
+    }
+
+    .btn:hover::before {
+      opacity: 1;
     }
 
     .btn:hover::after {
-      right: 1rem;
+      right: 1.2rem;
       opacity: 1;
+    }
+
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      opacity: 0.1;
+      animation: float 15s infinite linear;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0) rotate(0deg);
+      }
+      100% {
+        transform: translateY(-100vh) rotate(360deg);
+      }
     }
 
     @media (max-width: 768px) {
@@ -138,14 +335,36 @@
       }
       
       h1 {
-        font-size: 1.5rem;
+        font-size: 1.8rem;
+      }
+      
+      .theme-switch {
+        width: 50px;
+        height: 28px;
+      }
+      
+      .slider:before {
+        height: 20px;
+        width: 20px;
+      }
+      
+      input:checked + .slider:before {
+        transform: translateX(22px);
       }
     }
 
     @media (max-width: 480px) {
+      .header span {
+        font-size: 1.3rem;
+      }
+      
+      h1 {
+        font-size: 1.6rem;
+      }
+      
       .btn {
-        padding: 1rem 1.2rem;
-        font-size: 0.9rem;
+        padding: 1.2rem;
+        font-size: 1rem;
       }
       
       .container {
@@ -155,42 +374,100 @@
   </style>
 </head>
 <body>
+  <div class="particles" id="particles"></div>
+  
   <div class="header">
-    <span style="font-size: 1.5rem; font-weight: 700;">IDQR</span>
-    <a href="/dashboard/services" class="back-button">← Назад к услугам</a>
+    <span>IDQR</span>
+    <a href="/dashboard/services" class="back-button"><i class="fas fa-arrow-left"></i> Назад к услугам</a>
+    
+    <div class="theme-switch-wrapper">
+      <label class="theme-switch" for="checkbox">
+        <input type="checkbox" id="checkbox" />
+        <div class="slider">
+          <i class="fas fa-sun sun"></i>
+          <i class="fas fa-moon moon"></i>
+        </div>
+      </label>
+    </div>
   </div>
 
   <div class="container">
-    <h1>🧼 Уборка и гигиена</h1>
+    <h1><i class="fas fa-soap"></i> Уборка и гигиена</h1>
 
     <div class="grid">
-      <div class="btn">🚪 Вынос мусора от двери</div>
-      <div class="btn">🏢 Уборка офисов</div>
-      <div class="btn">🏬 Уборка магазинов</div>
-      <div class="btn">🏭 Уборка складов</div>
-      <div class="btn">🛏 Уборка гостиниц</div>
-      <div class="btn">🚧 После стройки</div>
-      <div class="btn">🏘 После аренды</div>
-      <div class="btn">🧴 Дезинфекция</div>
-      <div class="btn">💨 Озонирование</div>
-      <div class="btn">🌸 Ароматизация</div>
-      <div class="btn">🌀 Чистка вентиляции</div>
-      <div class="btn">🛋 Мягкая мебель</div>
-      <div class="btn">🪑 Диваны и кресла</div>
-      <div class="btn">🛏 Матрасы</div>
-      <div class="btn">🚗 Салон авто</div>
-      <div class="btn">🧼 Мытьё окон</div>
-      <div class="btn">🪟 После ремонта</div>
-      <div class="btn">🧽 Высотная мойка</div>
-      <div class="btn">🛍 Мойка витрин</div>
-      <div class="btn">❄ Уборка снега</div>
-      <div class="btn">🏕 Уборка наделов</div>
-      <div class="btn">🍂 Сбор листвы</div>
-      <div class="btn">🛣 Тротуары</div>
-      <div class="btn">🏘 Парковки и дворы</div>
-      <div class="btn">🚪 Уборка подъездов</div>
-      <div class="btn">🧊 Обработка от гололёда</div>
+      <div class="btn"><i class="fas fa-trash-alt"></i> Вынос мусора от двери</div>
+      <div class="btn"><i class="fas fa-building"></i> Уборка офисов</div>
+      <div class="btn"><i class="fas fa-store"></i> Уборка магазинов</div>
+      <div class="btn"><i class="fas fa-warehouse"></i> Уборка складов</div>
+      <div class="btn"><i class="fas fa-hotel"></i> Уборка гостиниц</div>
+      <div class="btn"><i class="fas fa-hard-hat"></i> После стройки</div>
+      <div class="btn"><i class="fas fa-key"></i> После аренды</div>
+      <div class="btn"><i class="fas fa-spray-can"></i> Дезинфекция</div>
+      <div class="btn"><i class="fas fa-wind"></i> Озонирование</div>
+      <div class="btn"><i class="fas fa-smile"></i> Ароматизация</div>
+      <div class="btn"><i class="fas fa-fan"></i> Чистка вентиляции</div>
+      <div class="btn"><i class="fas fa-couch"></i> Мягкая мебель</div>
+      <div class="btn"><i class="fas fa-chair"></i> Диваны и кресла</div>
+      <div class="btn"><i class="fas fa-bed"></i> Матрасы</div>
+      <div class="btn"><i class="fas fa-car"></i> Салон авто</div>
+      <div class="btn"><i class="fas fa-window-restore"></i> Мытьё окон</div>
+      <div class="btn"><i class="fas fa-paint-roller"></i> После ремонта</div>
+      <div class="btn"><i class="fas fa-building"></i> Высотная мойка</div>
+      <div class="btn"><i class="fas fa-store"></i> Мойка витрин</div>
+      <div class="btn"><i class="fas fa-snowflake"></i> Уборка снега</div>
+      <div class="btn"><i class="fas fa-campground"></i> Уборка наделов</div>
+      <div class="btn"><i class="fas fa-leaf"></i> Сбор листвы</div>
+      <div class="btn"><i class="fas fa-road"></i> Тротуары</div>
+      <div class="btn"><i class="fas fa-parking"></i> Парковки и дворы</div>
+      <div class="btn"><i class="fas fa-door-open"></i> Уборка подъездов</div>
+      <div class="btn"><i class="fas fa-icicles"></i> Обработка от гололёда</div>
     </div>
   </div>
+
+  <script>
+    // Создание частиц для фона
+    document.addEventListener('DOMContentLoaded', function() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 20;
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        const size = Math.random() * 50 + 10;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        particle.style.left = `${Math.random() * 100}vw`;
+        particle.style.top = `${Math.random() * 100}vh`;
+        
+        particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+        particle.style.animationDelay = `-${Math.random() * 20}s`;
+        
+        particlesContainer.appendChild(particle);
+      }
+      
+      // Обработка переключения темы
+      const toggleSwitch = document.querySelector('#checkbox');
+      const currentTheme = localStorage.getItem('theme') || 'light';
+      
+      if (currentTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        toggleSwitch.checked = true;
+      }
+      
+      function switchTheme(e) {
+        if (e.target.checked) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+          localStorage.setItem('theme', 'light');
+        }    
+      }
+      
+      toggleSwitch.addEventListener('change', switchTheme, false);
+    });
+  </script>
 </body>
 </html>
