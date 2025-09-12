@@ -94,40 +94,6 @@
       -webkit-text-fill-color: transparent;
     }
 
-    .back-button {
-      color: var(--text-primary);
-      text-decoration: none;
-      padding: 0.7rem 1.2rem;
-      border-radius: var(--border-radius-sm);
-      font-weight: 500;
-      background: rgba(108, 99, 255, 0.1);
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .back-button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: var(--transition);
-    }
-
-    .back-button:hover {
-      background: rgba(108, 99, 255, 0.2);
-    }
-
-    .back-button:hover::before {
-      left: 100%;
-    }
-
     .theme-switch-wrapper {
       display: flex;
       align-items: center;
@@ -326,10 +292,6 @@
         text-align: center;
       }
       
-      .back-button {
-        align-self: center;
-      }
-      
       .grid {
         grid-template-columns: 1fr;
       }
@@ -378,7 +340,6 @@
   
   <div class="header">
     <span>IDQR</span>
-    <a href="/dashboard/services" class="back-button"><i class="fas fa-arrow-left"></i></a>
     
     <div class="theme-switch-wrapper">
       <label class="theme-switch" for="checkbox">
