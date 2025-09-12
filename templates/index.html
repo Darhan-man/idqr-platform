@@ -490,9 +490,11 @@
         <div class="login-card">
             <h2><span class="logo"><i class="fas fa-key"></i></span> Авторизация администратора</h2>
 
-            <div class="error" style="display: none;"><i class="fas fa-exclamation-circle"></i> Неверный код доступа</div>
+            {% if error %}
+                <div class="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
+            {% endif %}
 
-            <form id="login-form">
+            <form method="post" action="/login">
                 <div class="input-group">
                     <input type="password" name="code" placeholder="Введите код доступа" required>
                 </div>
@@ -544,18 +546,6 @@
             }
             
             toggleSwitch.addEventListener('change', switchTheme, false);
-            
-            // Обработка формы входа
-            document.getElementById('login-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const errorDiv = document.querySelector('.error');
-                errorDiv.style.display = 'flex';
-                
-                // Симуляция проверки кода доступа
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 3000);
-            });
         });
     </script>
 </body>
