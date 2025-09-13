@@ -22,12 +22,37 @@
             --card-border: rgba(255, 255, 255, 0.2);
             --text-primary: #1E1E2E;
             --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
             --input-bg: rgba(255, 255, 255, 0.7);
             --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
             --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
             --border-radius: 16px;
             --border-radius-sm: 12px;
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="dark"] {
+            /* Тёмная тема */
+            --primary: #817BFF;
+            --primary-dark: #6C63FF;
+            --secondary: #FF7AC6;
+            --accent: #81E6FF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
         }
 
         * {
@@ -45,10 +70,100 @@
             min-height: 100vh;
         }
 
+        .theme-container {
+            display: flex;
+            justify-content: flex-end;
+            padding: 1rem 2rem;
+        }
+
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--card-bg);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--card-border);
+        }
+
+        .theme-switch {
+            display: inline-block;
+            position: relative;
+            width: 60px;
+            height: 34px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider i {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: white;
+        }
+
+        .slider .sun {
+            left: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slider .moon {
+            right: 8px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        input:checked + .slider .sun {
+            opacity: 1;
+        }
+
+        input:checked + .slider .moon {
+            opacity: 0;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 2rem 1.5rem;
+            padding: 1rem 1.5rem 2rem;
         }
 
         h2 {
@@ -143,8 +258,27 @@
         }
 
         @media (max-width: 768px) {
+            .theme-container {
+                padding: 1rem;
+                justify-content: center;
+            }
+            
             .modules-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .theme-switch {
+                width: 50px;
+                height: 28px;
+            }
+            
+            .slider:before {
+                height: 20px;
+                width: 20px;
+            }
+            
+            input:checked + .slider:before {
+                transform: translateX(22px);
             }
         }
 
@@ -154,7 +288,7 @@
             }
             
             .container {
-                padding: 1.5rem 1rem;
+                padding: 0 1rem 1.5rem;
             }
             
             .module-button {
@@ -166,6 +300,19 @@
 </head>
 <body>
     <div class="particles" id="particles"></div>
+    
+    <div class="theme-container">
+        <div class="theme-switch-wrapper">
+            <span>Тёмная тема</span>
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" />
+                <div class="slider">
+                    <i class="fas fa-sun sun"></i>
+                    <i class="fas fa-moon moon"></i>
+                </div>
+            </label>
+        </div>
+    </div>
 
     <div class="container">
         <h2><i class="fas fa-bullseye"></i> Выберите модуль для интеграции QR-кодов</h2>
@@ -214,6 +361,27 @@
                 
                 particlesContainer.appendChild(particle);
             }
+            
+            // Обработка переключения темы
+            const toggleSwitch = document.querySelector('#checkbox');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggleSwitch.checked = true;
+            }
+            
+            function switchTheme(e) {
+                if (e.target.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }    
+            }
+            
+            toggleSwitch.addEventListener('change', switchTheme, false);
         });
     </script>
 </body>
