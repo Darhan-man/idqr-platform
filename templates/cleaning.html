@@ -70,108 +70,6 @@
       min-height: 100vh;
     }
 
-    .header {
-      background: var(--nav-bg);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      color: var(--text-primary);
-      padding: 1.2rem 2.5rem;
-      box-shadow: var(--shadow);
-      border-bottom: 1px solid var(--nav-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    .header span {
-      font-size: 1.5rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .theme-switch-wrapper {
-      display: flex;
-      align-items: center;
-    }
-
-    .theme-switch {
-      display: inline-block;
-      position: relative;
-      width: 60px;
-      height: 34px;
-    }
-
-    .theme-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: var(--gray);
-      transition: .4s;
-      border-radius: 34px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-
-    .slider i {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 14px;
-      color: white;
-    }
-
-    .slider .sun {
-      left: 8px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .slider .moon {
-      right: 8px;
-      opacity: 1;
-      transition: opacity 0.3s ease;
-    }
-
-    input:checked + .slider .sun {
-      opacity: 1;
-    }
-
-    input:checked + .slider .moon {
-      opacity: 0;
-    }
-
     .container {
       max-width: 1200px;
       margin: 2rem auto;
@@ -225,7 +123,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(135deg, var(--success), var(--success-dark));
+      background: linear-gradient(135deg, var(--success), var(--success));
       opacity: 0;
       transition: var(--transition);
       z-index: -1;
@@ -285,13 +183,6 @@
     }
 
     @media (max-width: 768px) {
-      .header {
-        padding: 1rem;
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-      }
-      
       .grid {
         grid-template-columns: 1fr;
       }
@@ -299,27 +190,9 @@
       h1 {
         font-size: 1.8rem;
       }
-      
-      .theme-switch {
-        width: 50px;
-        height: 28px;
-      }
-      
-      .slider:before {
-        height: 20px;
-        width: 20px;
-      }
-      
-      input:checked + .slider:before {
-        transform: translateX(22px);
-      }
     }
 
     @media (max-width: 480px) {
-      .header span {
-        font-size: 1.3rem;
-      }
-      
       h1 {
         font-size: 1.6rem;
       }
@@ -337,20 +210,6 @@
 </head>
 <body>
   <div class="particles" id="particles"></div>
-  
-  <div class="header">
-    <span>IDQR</span>
-    
-    <div class="theme-switch-wrapper">
-      <label class="theme-switch" for="checkbox">
-        <input type="checkbox" id="checkbox" />
-        <div class="slider">
-          <i class="fas fa-sun sun"></i>
-          <i class="fas fa-moon moon"></i>
-        </div>
-      </label>
-    </div>
-  </div>
 
   <div class="container">
     <h1><i class="fas fa-soap"></i> Уборка и гигиена</h1>
@@ -407,27 +266,6 @@
         
         particlesContainer.appendChild(particle);
       }
-      
-      // Обработка переключения темы
-      const toggleSwitch = document.querySelector('#checkbox');
-      const currentTheme = localStorage.getItem('theme') || 'light';
-      
-      if (currentTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        toggleSwitch.checked = true;
-      }
-      
-      function switchTheme(e) {
-        if (e.target.checked) {
-          document.documentElement.setAttribute('data-theme', 'dark');
-          localStorage.setItem('theme', 'dark');
-        } else {
-          document.documentElement.setAttribute('data-theme', 'light');
-          localStorage.setItem('theme', 'light');
-        }    
-      }
-      
-      toggleSwitch.addEventListener('change', switchTheme, false);
     });
   </script>
 </body>

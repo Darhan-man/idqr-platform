@@ -315,7 +315,7 @@
     </div>
 
     <div class="container">
-        <h2><i class="fas fa-bullseye"></i> Выберите модуль</h2>
+        <h2><i class="fas fa-bullseye"></i> Выберите модуль для интеграции QR-кодов</h2>
 
         <div class="modules-grid">
             <a href="/dashboard/services" class="module-button"><i class="fas fa-tools"></i> Услуги и быт</a>

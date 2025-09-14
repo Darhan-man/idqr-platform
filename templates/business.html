@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IDQR: Бизнес и магазины</title>
+  <title>IDQR: Бизнес</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
@@ -68,159 +68,6 @@
       color: var(--text-primary);
       line-height: 1.6;
       min-height: 100vh;
-    }
-
-    .navbar {
-      background: var(--nav-bg);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      color: var(--text-primary);
-      padding: 1.2rem 2.5rem;
-      box-shadow: var(--shadow);
-      border-bottom: 1px solid var(--nav-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    .navbar h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .navbar nav {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .navbar a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      padding: 0.7rem 1.2rem;
-      border-radius: var(--border-radius-sm);
-      font-weight: 500;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .navbar a::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: var(--transition);
-    }
-
-    .navbar a:hover {
-      color: var(--text-primary);
-      background: rgba(108, 99, 255, 0.1);
-    }
-
-    .navbar a:hover::before {
-      left: 100%;
-    }
-
-    .navbar a.active {
-      background: rgba(108, 99, 255, 0.2);
-      color: var(--text-primary);
-      font-weight: 600;
-    }
-
-    .theme-switch-wrapper {
-      display: flex;
-      align-items: center;
-    }
-
-    .theme-switch {
-      display: inline-block;
-      position: relative;
-      width: 60px;
-      height: 34px;
-    }
-
-    .theme-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: var(--gray);
-      transition: .4s;
-      border-radius: 34px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-
-    .slider i {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 14px;
-      color: white;
-    }
-
-    .slider .sun {
-      left: 8px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    .slider .moon {
-      right: 8px;
-      opacity: 1;
-      transition: opacity 0.3s ease;
-    }
-
-    input:checked + .slider .sun {
-      opacity: 1;
-    }
-
-    input:checked + .slider .moon {
-      opacity: 0;
     }
 
     .container {
@@ -337,21 +184,6 @@
     }
 
     @media (max-width: 768px) {
-      .navbar {
-        padding: 1rem;
-        flex-direction: column;
-        text-align: center;
-      }
-      
-      .navbar nav {
-        justify-content: center;
-      }
-      
-      .navbar a {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
-      }
-      
       .modules-grid {
         grid-template-columns: 1fr;
       }
@@ -359,27 +191,9 @@
       h2 {
         font-size: 1.8rem;
       }
-      
-      .theme-switch {
-        width: 50px;
-        height: 28px;
-      }
-      
-      .slider:before {
-        height: 20px;
-        width: 20px;
-      }
-      
-      input:checked + .slider:before {
-        transform: translateX(22px);
-      }
     }
 
     @media (max-width: 480px) {
-      .navbar h1 {
-        font-size: 1.4rem;
-      }
-      
       h2 {
         font-size: 1.6rem;
       }
@@ -397,27 +211,6 @@
 </head>
 <body>
   <div class="particles" id="particles"></div>
-  
-  <div class="navbar">
-    <h1><i class="fas fa-building"></i> IDQR: Бизнес и магазины</h1>
-    <nav>
-      <a href="/dashboard/qr"><i class="fas fa-qrcode"></i> QR-Коды</a>
-      <a href="/dashboard/modules"><i class="fas fa-puzzle-piece"></i> Модули</a>
-      <a href="/dashboard/users"><i class="fas fa-user"></i> Пользователи</a>
-      <a href="/dashboard/stats"><i class="fas fa-chart-bar"></i> Статистика</a>
-      <a href="/dashboard/settings"><i class="fas fa-cog"></i> Настройки</a>
-    </nav>
-    
-    <div class="theme-switch-wrapper">
-      <label class="theme-switch" for="checkbox">
-        <input type="checkbox" id="checkbox" />
-        <div class="slider">
-          <i class="fas fa-sun sun"></i>
-          <i class="fas fa-moon moon"></i>
-        </div>
-      </label>
-    </div>
-  </div>
 
   <div class="container">
     <h2><i class="fas fa-store"></i> Категории: Бизнес и магазины</h2>
@@ -525,27 +318,6 @@
         
         particlesContainer.appendChild(particle);
       }
-      
-      // Обработка переключения темы
-      const toggleSwitch = document.querySelector('#checkbox');
-      const currentTheme = localStorage.getItem('theme') || 'light';
-      
-      if (currentTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        toggleSwitch.checked = true;
-      }
-      
-      function switchTheme(e) {
-        if (e.target.checked) {
-          document.documentElement.setAttribute('data-theme', 'dark');
-          localStorage.setItem('theme', 'dark');
-        } else {
-          document.documentElement.setAttribute('data-theme', 'light');
-          localStorage.setItem('theme', 'light');
-        }    
-      }
-      
-      toggleSwitch.addEventListener('change', switchTheme, false);
     });
   </script>
 </body>
