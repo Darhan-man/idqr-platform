@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать QR-код</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5.5.0/dist/iro.min.js"></script>
+    <style>
+        .color-picker { margin-bottom: 20px; }
+        .preview-container { 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+        }
+        .gradient-option {
+            cursor: pointer;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .gradient-option.active {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Редактировать QR-код</h2>
+        
+        <form method="post" action="/update_qr/{{ qr[0] }}">
+            <div class="mb-3">
+                <label for="title" class="form-label">Название QR-кода:</label>
+                <input type="text" class="form-control" id="title" name="title" value="{{ qr[1] }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="qrdata" class="form-label">Ссылка или данные:</label>
+                <input type="text" class="form-control" id="qrdata" name="qrdata" value="{{ qr[2] }}" required>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4">
+                    <h4>Цвет QR-кода</h4>
+                    <div id="qrColorPicker" class="color-picker"></div>
+                    <input type="hidden" id="qr_color" name="qr_color" value="{{ colors.qr_color }}">
+                </div>
+                
+                <div class="col-md-4">
+                    <h4>Цвет фона</h4>
+                    <div id="bgColorPicker" class="color-picker"></div>
+                    <input type="hidden" id="bg_color" name="bg_color" value="{{ colors.bg_color }}">
+                </div>
+                
+                <div class="col-md-4">
+                    <h4>Цвет текста</h4>
+                    <div id="textColorPicker" class="color-picker"></div>
+                    <input type="hidden" id="text_color" name="text_color" value="{{ colors.text_color }}">
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <h4>Градиент</h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="gradient-option {{ 'active' if colors.gradient == 'none' else '' }}" data-gradient="none">
+                            Без градиента
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="gradient-option {{ 'active' if colors.gradient == 'horizontal' else '' }}" data-gradient="horizontal">
+                            Горизонтальный
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="gradient-option {{ 'active' if colors.gradient == 'vertical' else '' }}" data-gradient="vertical">
+                            Вертикальный
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="gradient" name="gradient" value="{{ colors.gradient }}">
+                
+                <div id="gradientColorSection" class="mt-3" style="{{ 'display: none;' if colors.gradient == 'none' else '' }}">
+                    <h5>Второй цвет градиента</h5>
+                    <div id="gradientColorPicker" class="color-picker"></div>
+                    <input type="hidden" id="gradient_color" name="gradient_color" value="{{ colors.gradient_color }}">
+                </div>
+            </div>
+            
+            <div class="preview-container">
+                <h4>Предпросмотр</h4>
+                <div id="qrPreview" class="mt-3">
+                    <img src="/static/qr/{{ qr[3] }}" alt="QR Code Preview" class="img-fluid" style="max-width: 200px;">
+                    <p class="mt-2">{{ qr[1][:20] }}{% if qr[1]|length > 20 %}...{% endif %}</p>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Обновить QR-код</button>
+            <a href="/dashboard/qr" class="btn btn-secondary">Отмена</a>
+        </form>
+    </div>
+
+    <script>
+        // Инициализация цветовых пикеров
+        const qrColorPicker = new iro.ColorPicker('#qrColorPicker', {
+            width: 150,
+            color: '{{ colors.qr_color }}',
+            layout: [
+                { 
+                    component: iro.ui.Box,
+                },
+                { 
+                    component: iro.ui.Slider,
+                    options: {
+                        sliderType: 'hue'
+                    }
+                }
+            ]
+        });
+        
+        const bgColorPicker = new iro.ColorPicker('#bgColorPicker', {
+            width: 150,
+            color: '{{ colors.bg_color }}',
+            layout: [
+                { 
+                    component: iro.ui.Box,
+                },
+                { 
+                    component: iro.ui.Slider,
+                    options: {
+                        sliderType: 'hue'
+                    }
+                }
+            ]
+        });
+        
+        const textColorPicker = new iro.ColorPicker('#textColorPicker', {
+            width: 150,
+            color: '{{ colors.text_color }}',
+            layout: [
+                { 
+                    component: iro.ui.Box,
+                },
+                { 
+                    component: iro.ui.Slider,
+                    options: {
+                        sliderType: 'hue'
+                    }
+                }
+            ]
+        });
+        
+        const gradientColorPicker = new iro.ColorPicker('#gradientColorPicker', {
+            width: 150,
+            color: '{{ colors.gradient_color }}',
+            layout: [
+                { 
+                    component: iro.ui.Box,
+                },
+                { 
+                    component: iro.ui.Slider,
+                    options: {
+                        sliderType: 'hue'
+                    }
+                }
+            ]
+        });
+        
+        // Обновление скрытых полей при изменении цвета
+        qrColorPicker.on('color:change', function(color) {
+            document.getElementById('qr_color').value = color.hexString;
+            updatePreview();
+        });
+        
+        bgColorPicker.on('color:change', function(color) {
+            document.getElementById('bg_color').value = color.hexString;
+            updatePreview();
+        });
+        
+        textColorPicker.on('color:change', function(color) {
+            document.getElementById('text_color').value = color.hexString;
+            updatePreview();
+        });
+        
+        gradientColorPicker.on('color:change', function(color) {
+            document.getElementById('gradient_color').value = color.hexString;
+            updatePreview();
+        });
+        
+        // Обработка выбора градиента
+        document.querySelectorAll('.gradient-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.gradient-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                const gradientType = this.getAttribute('data-gradient');
+                document.getElementById('gradient').value = gradientType;
+                
+                const gradientColorSection = document.getElementById('gradientColorSection');
+                if (gradientType === 'none') {
+                    gradientColorSection.style.display = 'none';
+                } else {
+                    gradientColorSection.style.display = 'block';
+                }
+                
+                updatePreview();
+            });
+        });
+        
+        // Функция обновления предпросмотра
+        function updatePreview() {
+            // Здесь можно добавить логику для обновления предпросмотра
+            // В реальном приложении это может быть сложно реализовать без перезагрузки страницы
+            console.log('Цвета изменены, обновление предпросмотра...');
+        }
+    </script>
+</body>
+</html>
