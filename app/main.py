@@ -9,6 +9,7 @@ from datetime import datetime
 import aiosqlite
 from PIL import Image, ImageDraw, ImageFont
 import logging
+import textwrap
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -151,20 +152,29 @@ async def generate_qr(request: Request, qrdata: str = Form(...), title: str = Fo
             font = ImageFont.load_default()
             logger.warning("Шрифт RobotoSlab-Bold.ttf не найден, используется стандартный шрифт")
         
-        # Создаем изображение с текстом
-        draw = ImageDraw.Draw(qr_img)
-        text_bbox = draw.textbbox((0, 0), title, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
+        # Создаем новое изображение с местом для текста
+        # Разбиваем текст на строки по 20 символов
+        max_chars_per_line = 20
+        wrapped_text = textwrap.fill(title, width=max_chars_per_line)
+        lines = wrapped_text.split('\n')
+        
+        # Рассчитываем высоту текста
+        line_height = 30
+        text_height = len(lines) * line_height + 20
         
         # Создаем новое изображение с местом для текста
-        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height + 20), "white")
-        new_img.paste(qr_img, (0, text_height + 20))
+        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
+        new_img.paste(qr_img, (0, text_height))
         
         # Рисуем текст
         draw = ImageDraw.Draw(new_img)
-        text_x = (new_img.width - text_width) // 2
-        draw.text((text_x, 10), title, font=font, fill="black")
+        y = 10
+        for line in lines:
+            text_bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_x = (new_img.width - text_width) // 2
+            draw.text((text_x, y), line, font=font, fill="black")
+            y += line_height
         
         # Сохраняем изображение
         new_img.save(filepath)
