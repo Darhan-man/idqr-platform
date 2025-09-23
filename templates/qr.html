@@ -581,7 +581,7 @@
             <input type="text" name="title" placeholder="Название QR-кода" required>
             <textarea name="qrdata" placeholder="Ссылка или текст для кодирования" required></textarea>
             
-            <!-- Вернули цвета для QR-кода и текста, но убрали градиент -->
+            <!-- Стандартные цвета по умолчанию -->
             <div class="color-options">
                 <div class="color-option">
                     <label for="qr_color">Цвет QR-кода:</label>
@@ -597,6 +597,14 @@
                         <input type="color" id="text_color" name="text_color" value="#000000">
                         <input type="text" value="#000000" readonly>
                     </div>
+                </div>
+                
+                <!-- Добавим кнопку сброса к стандартным цветам -->
+                <div class="color-option">
+                    <label>&nbsp;</label>
+                    <button type="button" id="reset-colors" class="btn-reset" style="padding: 0.5rem; background: var(--gray); color: white; border: none; border-radius: var(--border-radius-sm); cursor: pointer;">
+                        <i class="fas fa-undo"></i> Стандартные цвета
+                    </button>
                 </div>
             </div>
             
@@ -696,8 +704,10 @@
             
             // Обработка выбора цветов
             const colorInputs = document.querySelectorAll('input[type="color"]');
-            colorInputs.forEach(input => {
-                const textInput = input.nextElementSibling;
+            const textInputs = document.querySelectorAll('.color-input input[type="text"]');
+            
+            colorInputs.forEach((input, index) => {
+                const textInput = textInputs[index];
                 
                 // Установка начального значения
                 textInput.value = input.value;
@@ -713,6 +723,15 @@
                         input.value = this.value;
                     }
                 });
+            });
+            
+            // Кнопка сброса к стандартным цветам
+            document.getElementById('reset-colors').addEventListener('click', function() {
+                document.getElementById('qr_color').value = '#000000';
+                document.querySelector('#qr_color').nextElementSibling.value = '#000000';
+                
+                document.getElementById('text_color').value = '#000000';
+                document.querySelector('#text_color').nextElementSibling.value = '#000000';
             });
         });
     </script>
