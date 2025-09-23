@@ -44,7 +44,7 @@ async def startup():
                     created_at TEXT NOT NULL,
                     scan_count INTEGER DEFAULT 0,
                     last_scan TEXT,
-                    colors TEXT DEFAULT '{"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000", "gradient": "none"}'
+                    colors TEXT DEFAULT '{"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000"}'
                 )
             """)
             await db.commit()
@@ -122,27 +122,6 @@ async def view_qr(request: Request, qr_id: int):
         logger.error(f"Ошибка при просмотре QR-кода: {e}")
         return RedirectResponse(url="/dashboard/qr", status_code=303)
 
-# --- Функция для создания градиента ---
-def create_gradient(width, height, color1, color2, direction='horizontal'):
-    """Создает градиентное изображение"""
-    base = Image.new('RGB', (width, height), color1)
-    top = Image.new('RGB', (width, height), color2)
-    mask = Image.new('L', (width, height))
-    mask_data = []
-    
-    if direction == 'horizontal':
-        for x in range(width):
-            mask_data.extend([int(255 * (x / width))] * height)
-    else:  # vertical
-        for y in range(height):
-            mask_data.extend([int(255 * (y / height))] * width)
-        mask_data = [mask_data[i::height] for i in range(height)]
-        mask_data = [item for sublist in mask_data for item in sublist]
-    
-    mask.putdata(mask_data)
-    base.paste(top, (0, 0), mask)
-    return base
-
 # --- Генерация QR (СОЗДАНИЕ, POST) ---
 @app.post("/generate_qr")
 async def generate_qr(
@@ -150,10 +129,7 @@ async def generate_qr(
     qrdata: str = Form(...), 
     title: str = Form(...),
     qr_color: str = Form("#000000"),
-    bg_color: str = Form("#FFFFFF"),
-    text_color: str = Form("#000000"),
-    gradient: str = Form("none"),
-    gradient_color: str = Form("#000000")
+    text_color: str = Form("#000000")
 ):
     try:
         # Генерируем уникальное имя файла
@@ -163,15 +139,13 @@ async def generate_qr(
         # Сохраняем цвета в формате JSON
         colors_json = json.dumps({
             "qr_color": qr_color,
-            "bg_color": bg_color,
-            "text_color": text_color,
-            "gradient": gradient,
-            "gradient_color": gradient_color
+            "bg_color": "#FFFFFF",  # Белый фон по умолчанию
+            "text_color": text_color
         })
 
         # Сначала создаем запись в БД
         async with aiosqlite.connect(DB_PATH) as db:
-            now = datetime.now().strftime("%Y-%м-%d %H:%M:%S")
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor = await db.execute(
                 "INSERT INTO qr_codes (title, data, filename, created_at, colors) VALUES (?, ?, ?, ?, ?)",
                 (title, qrdata, filename, now, colors_json)
@@ -193,22 +167,8 @@ async def generate_qr(
         qr.add_data(scan_url)
         qr.make(fit=True)
         
-        # Создаем изображение QR-кода с выбранными цветами
+        # Создаем изображение QR-кода с белым фоном и выбранным цветом
         qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
-        
-        # Создаем фон с градиентом или сплошным цветом
-        if gradient != "none":
-            bg_img = create_gradient(qr_img.width, qr_img.height, bg_color, gradient_color, gradient)
-        else:
-            bg_img = Image.new("RGB", (qr_img.width, qr_img.height), bg_color)
-        
-        # Накладываем QR-код на фон
-        final_img = Image.new("RGB", (qr_img.width, qr_img.height), "white")
-        final_img.paste(bg_img, (0, 0))
-        
-        # Создаем маску для QR-кода
-        qr_mask = qr_img.convert("L")
-        final_img.paste(qr_img, (0, 0), qr_mask)
         
         # Добавляем текст поверх QR-кода
         try:
@@ -228,9 +188,9 @@ async def generate_qr(
         line_height = 30
         text_height = len(lines) * line_height + 20
         
-        # Создаем новое изображение с местом для текста
-        new_img = Image.new("RGB", (final_img.width, final_img.height + text_height), bg_color)
-        new_img.paste(final_img, (0, text_height))
+        # Создаем новое изображение с белым фоном и местом для текста
+        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
+        new_img.paste(qr_img, (0, text_height))
         
         # Рисуем текст
         draw = ImageDraw.Draw(new_img)
@@ -307,6 +267,123 @@ async def delete_qr(qr_id: int):
     except Exception as e:
         logger.error(f"Ошибка при удалении QR-кода: {e}")
         return RedirectResponse(url="/dashboard/qr", status_code=303)
+
+# --- РЕДАКТИРОВАНИЕ QR ---
+@app.get("/dashboard/qr/edit/{qr_id}", response_class=HTMLResponse)
+async def edit_qr(request: Request, qr_id: int):
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
+            row = await cursor.fetchone()
+            
+            if row:
+                # Парсим цвета из JSON
+                colors = json.loads(row[7]) if row[7] else {
+                    "qr_color": "#000000",
+                    "bg_color": "#FFFFFF",
+                    "text_color": "#000000"
+                }
+                
+                return templates.TemplateResponse("edit_qr.html", {
+                    "request": request,
+                    "qr": row,
+                    "colors": colors,
+                    "active": "qr"
+                })
+            
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке формы редактирования: {e}")
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+
+# --- ОБНОВЛЕНИЕ QR ---
+@app.post("/update_qr/{qr_id}")
+async def update_qr(
+    request: Request, 
+    qr_id: int,
+    qrdata: str = Form(...), 
+    title: str = Form(...),
+    qr_color: str = Form("#000000"),
+    text_color: str = Form("#000000")
+):
+    try:
+        # Сохраняем цвета в формате JSON
+        colors_json = json.dumps({
+            "qr_color": qr_color,
+            "bg_color": "#FFFFFF",
+            "text_color": text_color
+        })
+
+        # Обновляем данные в БД
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE qr_codes SET title = ?, data = ?, colors = ? WHERE id = ?",
+                (title, qrdata, colors_json, qr_id)
+            )
+            await db.commit()
+            
+            # Получаем имя файла для перегенерации QR-кода
+            cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
+            row = await cursor.fetchone()
+            filename = row[0] if row else None
+
+        # Если есть файл, перегенерируем QR-код
+        if filename:
+            filepath = os.path.join(QR_FOLDER, filename)
+            
+            # Генерируем QR-код
+            scan_url = f"{BASE_URL}/scan/{qr_id}"
+            
+            # Создаем QR-код с выбранными цветами
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(scan_url)
+            qr.make(fit=True)
+            
+            # Создаем изображение QR-кода с белым фоном
+            qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
+            
+            # Добавляем текст поверх QR-кода
+            try:
+                font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
+            except IOError:
+                font = ImageFont.load_default()
+            
+            # Разбиваем текст на строки
+            max_chars_per_line = 20
+            wrapped_text = textwrap.fill(title, width=max_chars_per_line)
+            lines = wrapped_text.split('\n')
+            
+            # Рассчитываем высоту текста
+            line_height = 30
+            text_height = len(lines) * line_height + 20
+            
+            # Создаем новое изображение с белым фоном
+            new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
+            new_img.paste(qr_img, (0, text_height))
+            
+            # Рисуем текст
+            draw = ImageDraw.Draw(new_img)
+            y = 10
+            for line in lines:
+                text_bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_x = (new_img.width - text_width) // 2
+                draw.text((text_x, y), line, font=font, fill=text_color)
+                y += line_height
+            
+            # Сохраняем изображение
+            new_img.save(filepath)
+
+        return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении QR-кода: {e}")
+        return RedirectResponse(url=f"/dashboard/qr/edit/{qr_id}", status_code=303)
 
 # --- МОДУЛИ ---
 @app.get("/dashboard/modules", response_class=HTMLResponse)
