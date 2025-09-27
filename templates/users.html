@@ -17,6 +17,8 @@
             --gray: #8B8B9F;
             --success: #00C9A7;
             --error: #FF6B93;
+            --warning: #FF9E64;
+            --info: #64B5FF;
             --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
             --card-bg: rgba(255, 255, 255, 0.9);
             --card-border: rgba(255, 255, 255, 0.2);
@@ -43,6 +45,8 @@
             --gray: #7B7B8F;
             --success: #00D6B3;
             --error: #FF7A9E;
+            --warning: #FFB174;
+            --info: #74C1FF;
             --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
             --card-bg: rgba(30, 30, 46, 0.9);
             --card-border: rgba(255, 255, 255, 0.1);
@@ -101,6 +105,7 @@
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .navbar a {
@@ -222,7 +227,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 2rem auto;
             padding: 0 1.5rem;
         }
@@ -237,82 +242,219 @@
             font-weight: 700;
         }
 
-        .info-card {
+        .user-management {
             background: var(--card-bg);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            padding: 2.5rem;
+            padding: 2rem;
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
+            margin-bottom: 2rem;
             border: 1px solid var(--card-border);
         }
 
-        .info-card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-5px);
-        }
-
-        .info-icon {
-            font-size: 3rem;
-            margin-bottom: 1.5rem;
-            display: block;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .info-text {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            line-height: 1.6;
+        .add-user-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1rem;
             margin-bottom: 2rem;
         }
 
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .feature-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-            border-left: 4px solid var(--primary);
+        .add-user-form input {
+            padding: 1rem;
             border: 1px solid var(--card-border);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .feature-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            display: block;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .feature-title {
+            border-radius: var(--border-radius-sm);
+            background: var(--input-bg);
             color: var(--text-primary);
-            font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-size: 1rem;
         }
 
-        .feature-description {
+        .add-user-form input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+        }
+
+        .add-user-form button {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .add-user-form button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3);
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 1.2rem;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .users-table th {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .users-table tr:hover td {
+            background: rgba(108, 99, 255, 0.05);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-blocked {
+            background: var(--error);
+            color: white;
+        }
+
+        .status-frozen {
+            background: var(--warning);
+            color: var(--dark);
+        }
+
+        .status-inactive {
+            background: var(--gray);
+            color: white;
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            text-decoration: none;
+        }
+
+        .btn-activate {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-block {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-freeze {
+            background: var(--warning);
+            color: var(--dark);
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        .role-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .role-admin {
+            background: var(--primary);
+            color: white;
+        }
+
+        .role-user {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .status-icon {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--dark);
+            color: var(--light);
+            text-align: center;
+            border-radius: var(--border-radius-sm);
+            padding: 0.5rem;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8rem;
+            font-weight: normal;
+        }
+
+        .status-icon:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .freeze-time {
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: var(--gray);
         }
 
         .particles {
@@ -359,12 +501,17 @@
                 font-size: 0.9rem;
             }
             
-            .info-card {
-                padding: 2rem 1.5rem;
+            .add-user-form {
+                grid-template-columns: 1fr;
             }
             
-            .features-grid {
-                grid-template-columns: 1fr;
+            .users-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .user-actions {
+                flex-direction: column;
             }
             
             .theme-switch {
@@ -395,8 +542,13 @@
                 padding: 0 1rem;
             }
             
-            .info-card {
-                padding: 1.5rem 1rem;
+            .user-management {
+                padding: 1.5rem;
+            }
+            
+            .users-table th,
+            .users-table td {
+                padding: 0.8rem;
             }
         }
     </style>
@@ -428,35 +580,118 @@
     <div class="container">
         <h2><i class="fas fa-users-cog"></i> Управление пользователями</h2>
         
-        <div class="info-card">
-            <span class="info-icon"><i class="fas fa-lock"></i></span>
-            <p class="info-text">В будущем здесь будет регистрация, авторизация, роли и Telegram-связь.</p>
-            
-            <div class="features-grid">
-                <div class="feature-card">
-                    <span class="feature-icon"><i class="fas fa-edit"></i></span>
-                    <div class="feature-title">Регистрация</div>
-                    <div class="feature-description">Создание учетных записей пользователей</div>
+        <div class="user-management">
+            <h3><i class="fas fa-user-plus"></i> Добавить нового пользователя</h3>
+            <form method="post" action="/dashboard/users/add" class="add-user-form">
+                <input type="text" name="username" placeholder="Логин пользователя" required>
+                <input type="password" name="password" placeholder="Пароль" required>
+                <button type="submit">
+                    <i class="fas fa-plus"></i> Добавить пользователя
+                </button>
+            </form>
+
+            <h3><i class="fas fa-list"></i> Список пользователей</h3>
+            {% if users_list %}
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Логин</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th>Дата регистрации</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users_list %}
+                    <tr>
+                        <td>{{ user[0] }}</td>
+                        <td>
+                            {{ user[1] }}
+                            {% if user[7] %} {# is_blocked #}
+                            <span class="status-icon">
+                                <i class="fas fa-ban" style="color: var(--error); margin-left: 5px;"></i>
+                                <span class="tooltip">Пользователь заблокирован за нарушения</span>
+                            </span>
+                            {% elif user[8] %} {# frozen_until #}
+                            <span class="status-icon">
+                                <i class="fas fa-snowflake" style="color: var(--warning); margin-left: 5px;"></i>
+                                <span class="tooltip">Пользователь заморожен за нарушения</span>
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="role-badge {{ 'role-admin' if user[3] == 'admin' else 'role-user' }}">
+                                {{ 'Администратор' if user[3] == 'admin' else 'Пользователь' }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user[7] %}
+                                <span class="status-badge status-blocked">
+                                    <i class="fas fa-ban"></i> Заблокирован
+                                </span>
+                            {% elif user[8] %}
+                                <span class="status-badge status-frozen">
+                                    <i class="fas fa-snowflake"></i> Заморожен
+                                </span>
+                                <div class="freeze-time">
+                                    До: {{ user[8] }}
+                                </div>
+                            {% elif user[4] %}
+                                <span class="status-badge status-active">
+                                    <i class="fas fa-check"></i> Активен
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-inactive">
+                                    <i class="fas fa-times"></i> Неактивен
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user[5][:10] if user[5] else 'Н/Д' }}</td>
+                        <td>
+                            <div class="user-actions">
+                                {% if user[3] != 'admin' %}
+                                    {% if user[7] %}
+                                        <a href="/dashboard/users/unblock/{{ user[0] }}" class="btn-action btn-activate">
+                                            <i class="fas fa-lock-open"></i> Разблокировать
+                                        </a>
+                                    {% elif user[8] %}
+                                        <a href="/dashboard/users/unfreeze/{{ user[0] }}" class="btn-action btn-activate">
+                                            <i class="fas fa-fire"></i> Разморозить
+                                        </a>
+                                    {% else %}
+                                        {% if user[4] %}
+                                            <a href="/dashboard/users/block/{{ user[0] }}" class="btn-action btn-block">
+                                                <i class="fas fa-ban"></i> Заблокировать
+                                            </a>
+                                            <a href="/dashboard/users/freeze/{{ user[0] }}" class="btn-action btn-freeze">
+                                                <i class="fas fa-snowflake"></i> Заморозить
+                                            </a>
+                                            <a href="/dashboard/users/deactivate/{{ user[0] }}" class="btn-action btn-block">
+                                                <i class="fas fa-times"></i> Деактивировать
+                                            </a>
+                                        {% else %}
+                                            <a href="/dashboard/users/activate/{{ user[0] }}" class="btn-action btn-activate">
+                                                <i class="fas fa-check"></i> Активировать
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Системный аккаунт</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>Пользователи не найдены</p>
                 </div>
-                
-                <div class="feature-card">
-                    <span class="feature-icon"><i class="fas fa-key"></i></span>
-                    <div class="feature-title">Авторизация</div>
-                    <div class="feature-description">Система входа и управления доступом</div>
-                </div>
-                
-                <div class="feature-card">
-                    <span class="feature-icon"><i class="fas fa-crown"></i></span>
-                    <div class="feature-title">Роли</div>
-                    <div class="feature-description">Назначение прав и привилегий</div>
-                </div>
-                
-                <div class="feature-card">
-                    <span class="feature-icon"><i class="fas fa-paper-plane"></i></span>
-                    <div class="feature-title">Telegram-связь</div>
-                    <div class="feature-description">Интеграция с мессенджером</div>
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 
