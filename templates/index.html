@@ -1,291 +1,580 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
-<html lang="ru" class="h-full">
+<!DOCTYPE html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR: Вход в систему</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <!-- Particles.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-    <!-- Vanilla Tilt CDN for 3D tilt -->
-    <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.7.2/dist/vanilla-tilt.min.js"></script>
+    <title>IDQR — Современный вход в систему</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Custom CSS for advanced effects */
+        :root {
+            /* Светлая тема (по умолчанию) */
+            --primary: #6C63FF;
+            --primary-dark: #564FD8;
+            --secondary: #FF64B4;
+            --accent: #6DDFFF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+        }
+
+        [data-theme="dark"] {
+            /* Тёмная тема */
+            --primary: #817BFF;
+            --primary-dark: #6C63FF;
+            --secondary: #FF7AC6;
+            --accent: #81E6FF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
         body {
-            overflow: hidden;
-            background: linear-gradient(135deg, #1e3c72, #2a5298); /* Futuristic gradient */
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
             transition: background 0.5s ease;
         }
-        .dark body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+
+        .navbar {
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--text-primary);
+            padding: 1.2rem 2.5rem;
+            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
         }
-        /* Glassmorphism */
-        .glass {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+
+        .navbar h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        .dark .glass {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+
+        .navbar nav {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
         }
-        /* Parallax layers */
-        .parallax-bg {
+
+        .navbar a.disabled {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.7rem 1.2rem;
+            border-radius: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: not-allowed;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .navbar a.disabled::before {
+            content: '';
             position: absolute;
             top: 0;
-            left: 0;
+            left: -100%;
             width: 100%;
             height: 100%;
-            background: url('https://source.unsplash.com/random/1920x1080/?abstract') no-repeat center/cover;
-            transform: translateZ(-1px) scale(1.5);
-            z-index: -2;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.4s ease;
         }
-        .parallax-trees {
+
+        .navbar a.disabled:hover::before {
+            left: 100%;
+        }
+
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
             position: absolute;
+            right: 2.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .theme-switch {
+            display: inline-block;
+            position: relative;
+            width: 60px;
+            height: 34px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: url('https://source.unsplash.com/random/1920x1080/?forest') no-repeat center/cover;
-            transform: translateZ(-0.5px) scale(1.25);
-            z-index: -1;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
         }
-        /* Falling leaves animation */
-        .leaves {
+
+        .slider:before {
             position: absolute;
-            top: 0;
-            left: 0;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider i {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: white;
+        }
+
+        .slider .sun {
+            left: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slider .moon {
+            right: 8px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        input:checked + .slider .sun {
+            opacity: 1;
+        }
+
+        input:checked + .slider .moon {
+            opacity: 0;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            transition: all 0.3s ease;
             width: 100%;
-            height: 100%;
-            pointer-events: none;
+            max-width: 480px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, var(--primary), transparent);
+            opacity: 0.05;
+            transform: rotate(45deg);
+            z-index: 0;
+            animation: shimmer 8s ease infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: rotate(45deg) translateX(-50%);
+            }
+            100% {
+                transform: rotate(45deg) translateX(50%);
+            }
+        }
+
+        .login-card > * {
+            position: relative;
             z-index: 1;
         }
-        .leaf {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            background: url('https://img.icons8.com/color/48/000000/autumn.png') no-repeat center/contain;
-            animation: fall 10s linear infinite;
-            opacity: 0.6;
+
+        .login-card:hover {
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
         }
-        @keyframes fall {
-            0% { transform: translateY(-100%) rotate(0deg); }
-            100% { transform: translateY(100vh) rotate(360deg); }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
         }
-        /* Walking character */
-        .walker {
-            position: absolute;
-            bottom: 10%;
-            left: -10%;
-            width: 200px;
-            animation: walk 20s linear infinite;
+
+        .logo {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        .walker img {
-            width: 100%;
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
-        @keyframes walk {
-            0% { transform: translateX(0) scaleX(1); }
-            50% { transform: translateX(120vw) scaleX(1); }
-            50.01% { transform: translateX(120vw) scaleX(-1); }
-            100% { transform: translateX(0) scaleX(-1); }
+
+        .input-group {
+            position: relative;
         }
-        /* Input animations */
-        input:focus {
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
-        }
-        /* Neon effect for buttons */
-        button.neon {
-            box-shadow: 0 0 5px #fff, 0 0 25px #fff, 0 0 50px #fff, 0 0 100px #fff;
-            animation: neonGlow 1.5s ease-in-out infinite alternate;
-        }
-        @keyframes neonGlow {
-            from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073; }
-            to { text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6; }
-        }
-        /* Transitions */
-        * {
+
+        input {
+            padding: 1.2rem 1.5rem;
+            border: 1px solid rgba(139, 139, 159, 0.2);
+            border-radius: 12px;
+            font-size: 1rem;
             transition: all 0.3s ease;
+            width: 100%;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+            background: var(--input-bg);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 1.2rem 2rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: all 0.5s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3);
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        .user-login-link {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+
+        .user-login-link a {
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.8rem;
+            border-radius: 8px;
+        }
+
+        .user-login-link a:hover {
+            background: rgba(108, 99, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .error {
+            color: var(--error);
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 107, 147, 0.1);
+            border-radius: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0.1;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) rotate(0deg);
+            }
+            100% {
+                transform: translateY(-100vh) rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .navbar nav {
+                gap: 0.5rem;
+                justify-content: center;
+            }
+            
+            .navbar a.disabled {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+            
+            .theme-switch-wrapper {
+                position: relative;
+                right: auto;
+                top: auto;
+                transform: none;
+                margin-top: 1rem;
+            }
+            
+            .login-card {
+                padding: 2rem 1.5rem;
+            }
+            
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar h1 {
+                font-size: 1.4rem;
+            }
+            
+            h2 {
+                font-size: 1.4rem;
+            }
+            
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .theme-switch {
+                width: 50px;
+                height: 28px;
+            }
+            
+            .slider:before {
+                height: 20px;
+                width: 20px;
+            }
+            
+            input:checked + .slider:before {
+                transform: translateX(22px);
+            }
         }
     </style>
 </head>
-<body class="h-full text-gray-900 dark:text-gray-100 flex flex-col relative overflow-hidden">
-    <!-- Particles Container -->
-    <div id="particles-js" class="absolute inset-0 z-0"></div>
-
-    <!-- Parallax Layers -->
-    <div class="parallax-bg"></div>
-    <div class="parallax-trees"></div>
-
-    <!-- Falling Leaves -->
-    <div class="leaves">
-        <!-- Generate multiple leaves via JS -->
-    </div>
-
-    <!-- Walking Character -->
-    <div class="walker">
-        <img src="https://img.icons8.com/color/96/000000/businesswoman.png" alt="Walker">
-    </div>
-
-    <!-- Theme Toggle -->
-    <button id="theme-toggle" class="fixed top-4 right-4 p-3 rounded-full bg-glass text-white hover:scale-110 z-50">
-        <i class="fas fa-moon"></i>
-    </button>
-
-    <!-- Navigation -->
-    <nav class="bg-glass shadow-2xl z-10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-20 items-center">
-                <h1 class="text-3xl font-extrabold text-indigo-400 dark:text-indigo-300 neon">IDQR</h1>
-                <div class="flex space-x-6">
-                    <a href="#" class="text-lg hover:text-indigo-400 dark:hover:text-indigo-300 neon">QR-Коды</a>
-                    <a href="#" class="text-lg hover:text-indigo-400 dark:hover:text-indigo-300 neon">Модули</a>
-                    <a href="#" class="text-lg hover:text-indigo-400 dark:hover:text-indigo-300 neon">Пользователи</a>
-                    <a href="#" class="text-lg hover:text-indigo-400 dark:hover:text-indigo-300 neon">Статистика</a>
-                    <a href="#" class="text-lg hover:text-indigo-400 dark:hover:text-indigo-300 neon">Настройки</a>
+<body>
+    <div class="particles" id="particles"></div>
+    
+    <div class="navbar">
+        <h1><i class="fas fa-qrcode"></i> IDQR: Вход в систему</h1>
+        <nav>
+            <a href="#" class="disabled"><i class="fas fa-qrcode"></i> QR-Коды</a>
+            <a href="#" class="disabled"><i class="fas fa-puzzle-piece"></i> Модули</a>
+            <a href="#" class="disabled"><i class="fas fa-user"></i> Пользователи</a>
+            <a href="#" class="disabled"><i class="fas fa-chart-bar"></i> Статистика</a>
+            <a href="#" class="disabled"><i class="fas fa-cog"></i> Настройки</a>
+        </nav>
+        
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" />
+                <div class="slider">
+                    <i class="fas fa-sun sun"></i>
+                    <i class="fas fa-moon moon"></i>
                 </div>
-            </div>
+            </label>
         </div>
-    </nav>
+    </div>
 
-    <!-- Main Content -->
-    <div class="flex-grow flex items-center justify-center z-10">
-        <div class="glass p-10 rounded-3xl w-full max-w-lg" data-tilt data-tilt-max="20" data-tilt-speed="400" data-tilt-perspective="1000">
-            <h2 class="text-4xl font-bold text-center mb-8 text-indigo-600 dark:text-indigo-400 neon">Авторизация администратора</h2>
-            
+    <div class="main-container">
+        <div class="login-card">
+            <h2><span class="logo"><i class="fas fa-key"></i></span> Авторизация администратора</h2>
+
             {% if error %}
-                <div class="mb-6 p-4 bg-red-500/20 text-red-300 rounded-xl animate-bounce">
-                    {{ error }}
-                </div>
+                <div class="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
             {% endif %}
 
-            <form action="/login" method="POST" class="space-y-6">
-                <div class="relative">
-                    <input type="text" id="login" name="login" required class="w-full px-4 py-3 bg-transparent border border-indigo-300 dark:border-indigo-500 rounded-xl focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 placeholder-transparent peer">
-                    <label for="login" class="absolute left-4 top-3 text-indigo-600 dark:text-indigo-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-6 peer-focus:text-sm">Логин</label>
+            <form method="post" action="/login">
+                <div class="input-group">
+                    <input type="password" name="code" placeholder="Введите код доступа" required>
                 </div>
-                <div class="relative">
-                    <input type="password" id="password" name="password" required class="w-full px-4 py-3 bg-transparent border border-indigo-300 dark:border-indigo-500 rounded-xl focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 placeholder-transparent peer">
-                    <label for="password" class="absolute left-4 top-3 text-indigo-600 dark:text-indigo-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-6 peer-focus:text-sm">Пароль</label>
-                    <button type="button" id="toggle-password" class="absolute right-4 top-3 text-indigo-600 dark:text-indigo-400">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-                <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white font-bold rounded-xl shadow-lg neon">Войти в систему</button>
+                <button type="submit"><i class="fas fa-rocket"></i> Войти в систему</button>
             </form>
+
+            <div class="user-login-link">
+                <a href="/user/login">
+                    <i class="fas fa-user"></i> Войти как пользователь
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script>
-        // Particles.js
-        particlesJS('particles-js', {
-            particles: {
-                number: { value: 80, density: { enable: true, value_area: 800 } },
-                color: { value: '#ffffff' },
-                shape: { type: 'circle' },
-                opacity: { value: 0.5, random: false },
-                size: { value: 3, random: true },
-                line_linked: { enable: true, distance: 150, color: '#ffffff', opacity: 0.4, width: 1 },
-                move: { enable: true, speed: 6, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
-            },
-            interactivity: {
-                detect_on: 'canvas',
-                events: { onhover: { enable: true, mode: 'repulse' }, onclick: { enable: true, mode: 'push' }, resize: true },
-                modes: { grab: { distance: 400, line_linked: { opacity: 1 } }, bubble: { distance: 400, size: 40, duration: 2, opacity: 8 }, repulse: { distance: 200 }, push: { particles_nb: 4 }, remove: { particles_nb: 2 } }
-            },
-            retina_detect: true
-        });
-
-        // Theme Toggle
-        const toggleButton = document.getElementById('theme-toggle');
-        const html = document.documentElement;
-        if (localStorage.theme === 'dark' || (!localStorage.theme && matchMedia('(prefers-color-scheme: dark)').matches)) {
-            html.classList.add('dark');
-            toggleButton.innerHTML = '<i class="fas fa-sun"></i>';
-        }
-        toggleButton.addEventListener('click', () => {
-            html.classList.toggle('dark');
-            localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
-            toggleButton.innerHTML = html.classList.contains('dark') ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-        });
-
-        // 3D Tilt
-        VanillaTilt.init(document.querySelector('.glass'), { max: 25, speed: 400 });
-
-        // Password Toggle
-        const passwordInput = document.getElementById('password');
-        const togglePassword = document.getElementById('toggle-password');
-        togglePassword.addEventListener('click', () => {
-            const type = passwordInput.type === 'password' ? 'text' : 'password';
-            passwordInput.type = type;
-            togglePassword.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-        });
-
-        // Generate Falling Leaves
-        const leavesContainer = document.querySelector('.leaves');
-        for (let i = 0; i < 20; i++) {
-            const leaf = document.createElement('div');
-            leaf.classList.add('leaf');
-            leaf.style.left = `${Math.random() * 100}%`;
-            leaf.style.animationDelay = `${Math.random() * 5}s`;
-            leaf.style.animationDuration = `${10 + Math.random() * 10}s`;
-            leavesContainer.appendChild(leaf);
-        }
-
-        // Parallax Effect on Mouse Move
-        document.addEventListener('mousemove', (e) => {
-            const x = (window.innerWidth / 2 - e.clientX) / 50;
-            const y = (window.innerHeight / 2 - e.clientY) / 50;
-            document.querySelector('.parallax-bg').style.transform = `translate(${x}px, ${y}px) translateZ(-1px) scale(1.5)`;
-            document.querySelector('.parallax-trees').style.transform = `translate(${x/2}px, ${y/2}px) translateZ(-0.5px) scale(1.25)`;
+        // Создание частиц для фона
+        document.addEventListener('DOMContentLoaded', function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const size = Math.random() * 50 + 10;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                particle.style.animationDelay = `-${Math.random() * 20}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
+            
+            // Обработка переключения темы
+            const toggleSwitch = document.querySelector('#checkbox');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggleSwitch.checked = true;
+            }
+            
+            function switchTheme(e) {
+                if (e.target.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }    
+            }
+            
+            toggleSwitch.addEventListener('change', switchTheme, false);
         });
     </script>
 </body>
