@@ -21,6 +21,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Настройка сессий
+SECRET_KEY = secrets.token_hex(32)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -342,7 +347,7 @@ async def generate_qr(
 
         # Сначала создаем запись в БД
         async with aiosqlite.connect(DB_PATH) as db:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now().isoformat()
             cursor = await db.execute(
                 "INSERT INTO qr_codes (title, data, filename, created_at, colors) VALUES (?, ?, ?, ?, ?)",
                 (title, qrdata, filename, now, colors_json)
@@ -448,7 +453,7 @@ async def scan_qr(qr_id: int):
 
 # --- УДАЛЕНИЕ QR ---
 @app.get("/delete_qr/{qr_id}")
-async def delete_qr(qr_id: int):
+async def delete_qr(request: Request, qr_id: int):
     user = await check_admin(request)
     if isinstance(user, RedirectResponse):
         return user
@@ -609,13 +614,13 @@ async def check_user(request: Request):
 
 @app.get("/user/dashboard", response_class=HTMLResponse)
 async def user_dashboard(request: Request):
-    user = await check_user(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    user_resp = await check_user(request)
+    if not isinstance(user_resp, tuple):
+        return user_resp
     
     return templates.TemplateResponse("user_dashboard.html", {
         "request": request,
-        "user": user
+        "user": user_resp
     })
 
 # --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для админа) ---
@@ -710,7 +715,7 @@ async def freeze_user(request: Request, user_id: int):
     
     try:
         # Заморозка на 7 дней
-        freeze_until = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        freeze_until = (datetime.now() + timedelta(days=7)).isoformat()
         
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
@@ -848,30 +853,30 @@ async def cleaning_services(request: Request):
 # --- МАРШРУТЫ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ (только просмотр) ---
 @app.get("/user/modules", response_class=HTMLResponse)
 async def user_modules(request: Request):
-    user = await check_user(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    user_resp = await check_user(request)
+    if not isinstance(user_resp, tuple):
+        return user_resp
     return templates.TemplateResponse("user_modules.html", {"request": request})
 
 @app.get("/user/services", response_class=HTMLResponse)
 async def user_services(request: Request):
-    user = await check_user(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    user_resp = await check_user(request)
+    if not isinstance(user_resp, tuple):
+        return user_resp
     return templates.TemplateResponse("services.html", {"request": request})
 
 @app.get("/user/business", response_class=HTMLResponse)
 async def user_business(request: Request):
-    user = await check_user(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    user_resp = await check_user(request)
+    if not isinstance(user_resp, tuple):
+        return user_resp
     return templates.TemplateResponse("business.html", {"request": request})
 
 @app.get("/user/cleaning", response_class=HTMLResponse)
 async def user_cleaning(request: Request):
-    user = await check_user(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    user_resp = await check_user(request)
+    if not isinstance(user_resp, tuple):
+        return user_resp
     return templates.TemplateResponse("cleaning.html", {"request": request})
 
 # --- СТРАНИЦА БЛОКИРОВКИ ---
