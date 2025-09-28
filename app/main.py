@@ -83,8 +83,9 @@ async def startup():
             admin_exists = await cursor.fetchone()
             
             if not admin_exists:
-                # Создаём admin заново
-                password_hash = pwd_context.hash("admin123")
+                # Создаём admin заново, с усечением пароля для bcrypt
+                default_password = "admin123"[:72]  # Усечение до 72 байт
+                password_hash = pwd_context.hash(default_password)
                 await db.execute("""
                     INSERT INTO users (username, password_hash, role, created_at, is_active) 
                     VALUES (?, ?, ?, ?, ?)
@@ -108,7 +109,9 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    # Усечение пароля до 72 байт для bcrypt
+    truncated_password = password[:72]
+    return pwd_context.hash(truncated_password)
 
 async def authenticate_user(username: str, password: str):
     try:
@@ -145,8 +148,9 @@ async def authenticate_user(username: str, password: str):
             if not user[4]:  # is_active
                 return {"error": "inactive", "message": "Ваш аккаунт деактивирован"}
             
-            # Проверка пароля
-            if verify_password(password, user[2]):
+            # Проверка пароля (усечение для верификации)
+            truncated_password = password[:72]
+            if verify_password(truncated_password, user[2]):
                 return user
         
         return None
@@ -227,9 +231,10 @@ async def login(request: Request, code: str = Form(...)):
                 return RedirectResponse(url="/dashboard/qr", status_code=303)
             else:
                 logger.error("Admin user not found in DB")
-                # Временный хак: создаём admin на лету, если не найден
+                # Временный хак: создаём admin на лету, если не найден, с усечением
                 try:
-                    password_hash = pwd_context.hash("admin123")
+                    default_password = "admin123"[:72]  # Усечение до 72 байт
+                    password_hash = pwd_context.hash(default_password)
                     async with aiosqlite.connect(DB_PATH) as db:
                         cursor = await db.execute("""
                             INSERT INTO users (username, password_hash, role, created_at, is_active) 
