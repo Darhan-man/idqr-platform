@@ -14,6 +14,7 @@ import textwrap
 import json
 import secrets
 from passlib.context import CryptContext
+from starlette.middleware.sessions import SessionMiddleware
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
