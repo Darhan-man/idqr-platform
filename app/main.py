@@ -24,7 +24,7 @@ app = FastAPI()
 
 # Настройка сессий с поддержкой HTTPS (для Render)
 SECRET_KEY = secrets.token_hex(32)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=3600, same_site="lax", secure=True)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=3600, same_site="lax")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
