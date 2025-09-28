@@ -78,16 +78,28 @@ async def startup():
                 )
             """)
             
-            # Создаем администратора по умолчанию
-            await db.execute("""
-                INSERT OR IGNORE INTO users (username, password_hash, role, created_at) 
-                VALUES (?, ?, ?, ?)
-            """, ("admin", pwd_context.hash("admin123"), "admin", datetime.now().isoformat()))
+            # Проверяем, существует ли admin, если нет — создаём
+            cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+            admin_exists = await cursor.fetchone()
+            
+            if not admin_exists:
+                # Создаём admin заново
+                password_hash = pwd_context.hash("admin123")
+                await db.execute("""
+                    INSERT INTO users (username, password_hash, role, created_at, is_active) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, ("admin", password_hash, "admin", datetime.now().isoformat(), 1))
+                logger.info("Admin user created successfully")
+            else:
+                logger.info("Admin user already exists")
             
             await db.commit()
+            
+            # Финальная проверка
             cursor = await db.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
-            count = await cursor.fetchone()
-            logger.info(f"База данных инициализирована. Admin user exists: {count[0] > 0}")
+            count = (await cursor.fetchone())[0]
+            logger.info(f"База данных инициализирована. Admin user exists: {count > 0}")
+            
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
 
@@ -215,6 +227,21 @@ async def login(request: Request, code: str = Form(...)):
                 return RedirectResponse(url="/dashboard/qr", status_code=303)
             else:
                 logger.error("Admin user not found in DB")
+                # Временный хак: создаём admin на лету, если не найден
+                try:
+                    password_hash = pwd_context.hash("admin123")
+                    async with aiosqlite.connect(DB_PATH) as db:
+                        cursor = await db.execute("""
+                            INSERT INTO users (username, password_hash, role, created_at, is_active) 
+                            VALUES (?, ?, ?, ?, ?)
+                        """, ("admin", password_hash, "admin", datetime.now().isoformat(), 1))
+                        await db.commit()
+                        admin_id = cursor.lastrowid
+                        logger.info(f"Admin user created on-the-fly with ID: {admin_id}")
+                        request.session["user_id"] = admin_id
+                        return RedirectResponse(url="/dashboard/qr", status_code=303)
+                except Exception as create_e:
+                    logger.error(f"Failed to create admin on-the-fly: {create_e}")
         except Exception as e:
             logger.error(f"Error fetching admin user: {e}")
     
