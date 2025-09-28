@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Настройка сессий
+# Настройка сессий с поддержкой HTTPS (для Render)
 SECRET_KEY = secrets.token_hex(32)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=3600, same_site="lax", secure=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -85,7 +85,9 @@ async def startup():
             """, ("admin", pwd_context.hash("admin123"), "admin", datetime.now().isoformat()))
             
             await db.commit()
-            logger.info("База данных инициализирована")
+            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
+            count = await cursor.fetchone()
+            logger.info(f"База данных инициализирована. Admin user exists: {count[0] > 0}")
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
 
@@ -198,15 +200,23 @@ async def home(request: Request):
 # --- ВХОД АДМИНИСТРАТОРА ---
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, code: str = Form(...)):
+    logger.info(f"Received code: '{code}'")  # Для дебага в логах Render
     if code == ADMIN_CODE:
         # Находим пользователя admin
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM users WHERE username = 'admin'")
-            admin_user = await cursor.fetchone()
-        
-        if admin_user:
-            request.session["user_id"] = admin_user[0]
-            return RedirectResponse(url="/dashboard/qr", status_code=303)
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                cursor = await db.execute("SELECT * FROM users WHERE username = 'admin'")
+                admin_user = await cursor.fetchone()
+                logger.info(f"Admin user found: {admin_user is not None}")
+            
+            if admin_user:
+                request.session["user_id"] = admin_user[0]
+                logger.info(f"Session set for user_id: {admin_user[0]}")
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+            else:
+                logger.error("Admin user not found in DB")
+        except Exception as e:
+            logger.error(f"Error fetching admin user: {e}")
     
     return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
 
@@ -886,4 +896,5 @@ async def user_blocked(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
