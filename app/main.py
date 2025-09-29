@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, Request, HTTPException, Depends
+from fastapi import FastAPI, Form, Request, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,33 +14,31 @@ import textwrap
 import json
 import secrets
 from passlib.context import CryptContext
-from starlette.middleware.sessions import SessionMiddleware
+import ipaddress
+from typing import Optional
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-
-# Настройка сессий с поддержкой HTTPS (для Render)
-SECRET_KEY = secrets.token_hex(32)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=3600, same_site="lax")
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # --- Константы ---
 QR_FOLDER = "static/qr"
+LOGOS_FOLDER = "static/logos"
 DB_PATH = "qr_data.db"
 ADMIN_CODE = "admin1990"
 BASE_URL = "https://idqr-platform.onrender.com"
 
-# Настройка безопасности (временно plaintext для избежания bcrypt ошибок)
+# Настройка безопасности
 security = HTTPBasic()
-pwd_context = CryptContext(schemes=["plaintext"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Создаем папки если они не существуют
 os.makedirs(QR_FOLDER, exist_ok=True)
+os.makedirs(LOGOS_FOLDER, exist_ok=True)
 os.makedirs("static/fonts", exist_ok=True)
 
 # --- ИНИЦИАЛИЗАЦИЯ БД ---
@@ -59,11 +57,11 @@ async def startup():
                     scan_count INTEGER DEFAULT 0,
                     last_scan TEXT,
                     colors TEXT DEFAULT '{"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000"}',
-                    user_id INTEGER DEFAULT 1
+                    user_id INTEGER
                 )
             """)
             
-            # Таблица пользователей с полями для блокировки и заморозки
+            # Таблица пользователей с расширенными полями
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,44 +72,78 @@ async def startup():
                     created_at TEXT NOT NULL,
                     last_login TEXT,
                     is_blocked BOOLEAN NOT NULL DEFAULT 0,
-                    frozen_until TEXT
+                    frozen_until TEXT,
+                    block_count INTEGER DEFAULT 0,
+                    theme TEXT NOT NULL DEFAULT 'light',
+                    logo_url TEXT,
+                    ip_address TEXT
                 )
             """)
             
-            # Проверяем, существует ли admin, если нет — создаём
-            cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
-            admin_exists = await cursor.fetchone()
+            # Таблица заблокированных IP
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS blocked_ips (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT UNIQUE NOT NULL,
+                    reason TEXT,
+                    blocked_until TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
             
-            if not admin_exists:
-                # Создаём admin (plaintext)
-                password_hash = pwd_context.hash("admin123")
-                await db.execute("""
-                    INSERT INTO users (username, password_hash, role, created_at, is_active) 
-                    VALUES (?, ?, ?, ?, ?)
-                """, ("admin", password_hash, "admin", datetime.now().isoformat(), 1))
-                logger.info("Admin user created successfully")
-            else:
-                logger.info("Admin user already exists")
+            # Создаем администратора по умолчанию
+            await db.execute("""
+                INSERT OR IGNORE INTO users (username, password_hash, role, created_at) 
+                VALUES (?, ?, ?, ?)
+            """, ("admin", pwd_context.hash("admin123"), "admin", datetime.now().isoformat()))
             
             await db.commit()
-            
-            # Финальная проверка
-            cursor = await db.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
-            count = (await cursor.fetchone())[0]
-            logger.info(f"База данных инициализирована. Admin user exists: {count > 0}")
-            
+            logger.info("База данных инициализирована")
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
 
-# --- Функции аутентификации ---
+# --- Функции аутентификации и утилиты ---
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-async def authenticate_user(username: str, password: str):
+async def check_ip_blocked(ip_address: str) -> bool:
+    """Проверяет заблокирован ли IP"""
     try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(
+                "SELECT blocked_until FROM blocked_ips WHERE ip_address = ?", 
+                (ip_address,)
+            )
+            result = await cursor.fetchone()
+            
+            if result:
+                blocked_until = result[0]
+                if blocked_until:
+                    # Временная блокировка
+                    if datetime.now() < datetime.fromisoformat(blocked_until):
+                        return True
+                    else:
+                        # Время блокировки истекло - удаляем запись
+                        await db.execute("DELETE FROM blocked_ips WHERE ip_address = ?", (ip_address,))
+                        await db.commit()
+                        return False
+                else:
+                    # Перманентная блокировка
+                    return True
+    except Exception as e:
+        logger.error(f"Ошибка при проверке IP: {e}")
+    
+    return False
+
+async def authenticate_user(username: str, password: str, ip_address: str):
+    try:
+        # Сначала проверяем блокировку IP
+        if await check_ip_blocked(ip_address):
+            return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
+        
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(
                 "SELECT * FROM users WHERE username = ?", 
@@ -120,7 +152,7 @@ async def authenticate_user(username: str, password: str):
             user = await cursor.fetchone()
             
         if user:
-            # Проверка блокировки
+            # Проверка блокировки аккаунта
             if user[7]:  # is_blocked
                 return {"error": "blocked", "message": "Ваш аккаунт заблокирован за нарушения"}
             
@@ -147,6 +179,13 @@ async def authenticate_user(username: str, password: str):
             
             # Проверка пароля
             if verify_password(password, user[2]):
+                # Обновляем IP адрес
+                async with aiosqlite.connect(DB_PATH) as db:
+                    await db.execute(
+                        "UPDATE users SET ip_address = ?, last_login = ? WHERE id = ?",
+                        (ip_address, datetime.now().isoformat(), user[0])
+                    )
+                    await db.commit()
                 return user
         
         return None
@@ -156,6 +195,12 @@ async def authenticate_user(username: str, password: str):
 
 async def get_current_user(request: Request):
     user_id = request.session.get("user_id")
+    client_ip = request.client.host
+    
+    # Проверяем блокировку IP
+    if await check_ip_blocked(client_ip):
+        return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
+    
     if user_id:
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -189,63 +234,113 @@ async def get_current_user(request: Request):
     
     return None
 
-# --- ГЛАВНАЯ (автоматически в админку) ---
+def get_client_ip(request: Request):
+    return request.client.host
+
+# --- РЕГИСТРАЦИЯ ---
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+@app.post("/register")
+async def register(
+    request: Request, 
+    username: str = Form(...), 
+    password: str = Form(...),
+    role: str = Form("user")
+):
+    client_ip = get_client_ip(request)
+    
+    # Проверяем блокировку IP
+    if await check_ip_blocked(client_ip):
+        return templates.TemplateResponse("register.html", {
+            "request": request, 
+            "error": "Ваш IP-адрес заблокирован. Регистрация невозможна."
+        })
+    
+    try:
+        # Проверяем существование пользователя
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT id FROM users WHERE username = ?", (username,))
+            existing_user = await cursor.fetchone()
+            
+            if existing_user:
+                return templates.TemplateResponse("register.html", {
+                    "request": request, 
+                    "error": "Пользователь с таким именем уже существует"
+                })
+            
+            # Создаем пользователя
+            password_hash = get_password_hash(password)
+            created_at = datetime.now().isoformat()
+            
+            await db.execute(
+                "INSERT INTO users (username, password_hash, role, created_at, ip_address) VALUES (?, ?, ?, ?, ?)",
+                (username, password_hash, role, created_at, client_ip)
+            )
+            await db.commit()
+            
+        return RedirectResponse(url="/user/login", status_code=303)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при регистрации: {e}")
+        return templates.TemplateResponse("register.html", {
+            "request": request, 
+            "error": "Ошибка при регистрации"
+        })
+
+# --- ГЛАВНАЯ СТРАНИЦА ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    client_ip = get_client_ip(request)
+    
+    # Проверяем блокировку IP
+    if await check_ip_blocked(client_ip):
+        return templates.TemplateResponse("ip_blocked.html", {
+            "request": request,
+            "message": "Ваш IP-адрес заблокирован"
+        })
+    
     # Проверяем, авторизован ли пользователь
     user = await get_current_user(request)
     if user and not isinstance(user, dict):
-        if user[3] == "admin":  # role
+        if user[3] == "admin":
             return RedirectResponse(url="/dashboard/qr", status_code=303)
         else:
             return RedirectResponse(url="/user/dashboard", status_code=303)
     elif isinstance(user, dict):
-        # Пользователь заблокирован или заморожен - показываем сообщение
-        return templates.TemplateResponse("user_blocked.html", {
-            "request": request,
-            "message": user["message"]
-        })
+        # Пользователь заблокирован или заморожен
+        if user["error"] == "frozen":
+            return templates.TemplateResponse("account_frozen.html", {
+                "request": request,
+                "message": user["message"]
+            })
+        else:
+            return templates.TemplateResponse("user_blocked.html", {
+                "request": request,
+                "message": user["message"]
+            })
     
-    # Если не авторизован - показываем вход в админку
     return templates.TemplateResponse("index.html", {"request": request})
 
 # --- ВХОД АДМИНИСТРАТОРА ---
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, code: str = Form(...)):
-    logger.info(f"Received code: '{code}'")  # Для дебага в логах Render
     if code == ADMIN_CODE:
         # Находим пользователя admin
-        try:
-            async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.execute("SELECT * FROM users WHERE username = 'admin'")
-                admin_user = await cursor.fetchone()
-                logger.info(f"Admin user found: {admin_user is not None}")
-            
-            if admin_user:
-                request.session["user_id"] = admin_user[0]
-                logger.info(f"Session set for user_id: {admin_user[0]}")
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-            else:
-                logger.error("Admin user not found in DB")
-                # Временный хак: создаём admin на лету, если не найден
-                try:
-                    password_hash = pwd_context.hash("admin123")
-                    async with aiosqlite.connect(DB_PATH) as db:
-                        cursor = await db.execute("""
-                            INSERT INTO users (username, password_hash, role, created_at, is_active) 
-                            VALUES (?, ?, ?, ?, ?)
-                        """, ("admin", password_hash, "admin", datetime.now().isoformat(), 1))
-                        await db.commit()
-                        admin_id = cursor.lastrowid
-                        logger.info(f"Admin user created on-the-fly with ID: {admin_id}")
-                        request.session["user_id"] = admin_id
-                        return RedirectResponse(url="/dashboard/qr", status_code=303)
-                except Exception as create_e:
-                    logger.error(f"Failed to create admin on-the-fly: {create_e}")
-        except Exception as e:
-            logger.error(f"Error fetching admin user: {e}")
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM users WHERE username = 'admin'")
+            admin_user = await cursor.fetchone()
+        
+        if admin_user:
+            request.session["user_id"] = admin_user[0]
+            return RedirectResponse(url="/dashboard/qr", status_code=303)
     
-    return templates.TemplateResponse("index.html", {"request": request, "error": "Неверный код"})
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "error": "Неверный код",
+        "show_user_hint": True
+    })
 
 # --- ВХОД ПОЛЬЗОВАТЕЛЯ ---
 @app.get("/user/login", response_class=HTMLResponse)
@@ -254,22 +349,23 @@ async def user_login_page(request: Request):
 
 @app.post("/user/login", response_class=HTMLResponse)
 async def user_login(request: Request, username: str = Form(...), password: str = Form(...)):
-    result = await authenticate_user(username, password)
+    client_ip = get_client_ip(request)
+    result = await authenticate_user(username, password, client_ip)
     
     if isinstance(result, dict) and "error" in result:
-        return templates.TemplateResponse("user_login.html", {
-            "request": request, 
-            "error": result["message"]
-        })
+        if result["error"] == "frozen":
+            return templates.TemplateResponse("account_frozen.html", {
+                "request": request,
+                "message": result["message"]
+            })
+        else:
+            return templates.TemplateResponse("user_login.html", {
+                "request": request, 
+                "error": result["message"]
+            })
     elif result:
         request.session["user_id"] = result[0]
-        # Обновляем время последнего входа
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET last_login = ? WHERE id = ?",
-                (datetime.now().isoformat(), result[0])
-            )
-            await db.commit()
+        request.session["user_role"] = result[3]
         return RedirectResponse(url="/user/dashboard", status_code=303)
     
     return templates.TemplateResponse("user_login.html", {
@@ -287,27 +383,53 @@ async def logout(request: Request):
 async def check_admin(request: Request):
     user = await get_current_user(request)
     if isinstance(user, dict):
-        return RedirectResponse(url="/", status_code=303)
+        return user
     if not user or user[3] != "admin":
         return RedirectResponse(url="/", status_code=303)
     return user
 
+# --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ/ИП ---
+async def check_user_access(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, dict):
+        return user
+    if not user:
+        return RedirectResponse(url="/user/login", status_code=303)
+    return user
+
+async def check_ip_access(request: Request):
+    """Проверка доступа для ИП (может создавать QR)"""
+    user = await get_current_user(request)
+    if isinstance(user, dict):
+        return user
+    if not user:
+        return RedirectResponse(url="/user/login", status_code=303)
+    if user[3] not in ["ip", "admin"]:
+        return RedirectResponse(url="/user/dashboard", status_code=303)
+    return user
+
+# --- QR-КОДЫ (для админа и ИП) ---
 @app.get("/dashboard/qr", response_class=HTMLResponse)
 async def dashboard_qr(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+            if user[3] == "admin":
+                cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+            else:
+                cursor = await db.execute("SELECT * FROM qr_codes WHERE user_id = ? ORDER BY id DESC", (user[0],))
             qr_list = await cursor.fetchall()
+        
         return templates.TemplateResponse("qr.html", {
             "request": request,
             "qr_list": qr_list,
             "qr_url": None,
             "qr_title": None,
-            "active": "qr"
+            "active": "qr",
+            "user": user
         })
     except Exception as e:
         logger.error(f"Ошибка при загрузке QR-кодов: {e}")
@@ -317,47 +439,11 @@ async def dashboard_qr(request: Request):
             "qr_url": None,
             "qr_title": None,
             "active": "qr",
+            "user": user,
             "error": "Ошибка при загрузке данных"
         })
 
-# --- ПРОСМОТР ОТДЕЛЬНОГО QR ---
-@app.get("/dashboard/qr/view/{qr_id}", response_class=HTMLResponse)
-async def view_qr(request: Request, qr_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-            qr_list = await cursor.fetchall()
-            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
-            row = await cursor.fetchone()
-        
-        if row:
-            qr_url = f"/static/qr/{row[3]}"
-            qr_title = row[1]
-            
-            # Проверяем существует ли файл
-            if not os.path.exists(os.path.join(QR_FOLDER, row[3])):
-                logger.warning(f"Файл QR-кода не найден: {row[3]}")
-                qr_url = None
-        else:
-            qr_url = None
-            qr_title = None
-            
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": qr_list,
-            "qr_url": qr_url,
-            "qr_title": qr_title,
-            "active": "qr"
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при просмотре QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- Генерация QR (СОЗДАНИЕ, POST) ---
+# --- Генерация QR (для админа и ИП) ---
 @app.post("/generate_qr")
 async def generate_qr(
     request: Request, 
@@ -366,8 +452,8 @@ async def generate_qr(
     qr_color: str = Form("#000000"),
     text_color: str = Form("#000000")
 ):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
@@ -378,25 +464,23 @@ async def generate_qr(
         # Сохраняем цвета в формате JSON
         colors_json = json.dumps({
             "qr_color": qr_color,
-            "bg_color": "#FFFFFF",  # Белый фон по умолчанию
+            "bg_color": "#FFFFFF",
             "text_color": text_color
         })
 
-        # Сначала создаем запись в БД
+        # Создаем запись в БД
         async with aiosqlite.connect(DB_PATH) as db:
-            now = datetime.now().isoformat()
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor = await db.execute(
-                "INSERT INTO qr_codes (title, data, filename, created_at, colors) VALUES (?, ?, ?, ?, ?)",
-                (title, qrdata, filename, now, colors_json)
+                "INSERT INTO qr_codes (title, data, filename, created_at, colors, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (title, qrdata, filename, now, colors_json, user[0])
             )
             await db.commit()
             qr_id = cursor.lastrowid
-            logger.info(f"Создана запись в БД с ID: {qr_id}")
 
         # Генерируем QR-код
         scan_url = f"{BASE_URL}/scan/{qr_id}"
         
-        # Создаем QR-код с выбранными цветами
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -406,32 +490,24 @@ async def generate_qr(
         qr.add_data(scan_url)
         qr.make(fit=True)
         
-        # Создаем изображение QR-кода с белым фоном и выбранным цветом
         qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
         
-        # Добавляем текст поверх QR-кода
+        # Добавляем текст
         try:
-            # Пытаемся использовать шрифт RobotoSlab
             font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
         except IOError:
-            # Если шрифт не найден, используем стандартный
             font = ImageFont.load_default()
-            logger.warning("Шрифт RobotoSlab-Bold.ttf не найден, используется стандартный шрифт")
         
-        # Разбиваем текст на строки по 20 символов
         max_chars_per_line = 20
         wrapped_text = textwrap.fill(title, width=max_chars_per_line)
         lines = wrapped_text.split('\n')
         
-        # Рассчитываем высоту текста
         line_height = 30
         text_height = len(lines) * line_height + 20
         
-        # Создаем новое изображение с белым фоном и местом для текста
         new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
         new_img.paste(qr_img, (0, text_height))
         
-        # Рисуем текст
         draw = ImageDraw.Draw(new_img)
         y = 10
         for line in lines:
@@ -441,32 +517,13 @@ async def generate_qr(
             draw.text((text_x, y), line, font=font, fill=text_color)
             y += line_height
         
-        # Сохраняем изображение
         new_img.save(filepath)
-        logger.info(f"QR-код сохранен в файл: {filepath}")
 
-        # Перенаправляем на страницу просмотра
         return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
     
     except Exception as e:
         logger.error(f"Ошибка при генерации QR-кода: {e}")
-        
-        # Удаляем запись из БД, если она была создана
-        try:
-            async with aiosqlite.connect(DB_PATH) as db:
-                await db.execute("DELETE FROM qr_codes WHERE filename = ?", (filename,))
-                await db.commit()
-        except:
-            pass
-            
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": [],
-            "qr_url": None,
-            "qr_title": None,
-            "active": "qr",
-            "error": f"Ошибка при генерации QR-кода: {str(e)}"
-        })
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
 
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
@@ -491,191 +548,53 @@ async def scan_qr(qr_id: int):
 # --- УДАЛЕНИЕ QR ---
 @app.get("/delete_qr/{qr_id}")
 async def delete_qr(request: Request, qr_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
-            row = await cursor.fetchone()
-            if row:
-                filename = row[0]
-                path = os.path.join(QR_FOLDER, filename)
-                if os.path.exists(path):
-                    os.remove(path)
-                await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
-                await db.commit()
+            # Проверяем владельца QR-кода
+            cursor = await db.execute("SELECT user_id FROM qr_codes WHERE id = ?", (qr_id,))
+            qr_owner = await cursor.fetchone()
+            
+            if qr_owner and (user[3] == "admin" or qr_owner[0] == user[0]):
+                cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
+                row = await cursor.fetchone()
+                if row:
+                    filename = row[0]
+                    path = os.path.join(QR_FOLDER, filename)
+                    if os.path.exists(path):
+                        os.remove(path)
+                    await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
+                    await db.commit()
+        
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     except Exception as e:
         logger.error(f"Ошибка при удалении QR-кода: {e}")
         return RedirectResponse(url="/dashboard/qr", status_code=303)
 
-# --- РЕДАКТИРОВАНИЕ QR ---
-@app.get("/dashboard/qr/edit/{qr_id}", response_class=HTMLResponse)
-async def edit_qr(request: Request, qr_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
-            row = await cursor.fetchone()
-            
-            if row:
-                # Парсим цвета из JSON
-                colors = json.loads(row[7]) if row[7] else {
-                    "qr_color": "#000000",
-                    "bg_color": "#FFFFFF",
-                    "text_color": "#000000"
-                }
-                
-                return templates.TemplateResponse("edit_qr.html", {
-                    "request": request,
-                    "qr": row,
-                    "colors": colors,
-                    "active": "qr"
-                })
-            
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке формы редактирования: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- ОБНОВЛЕНИЕ QR ---
-@app.post("/update_qr/{qr_id}")
-async def update_qr(
-    request: Request, 
-    qr_id: int,
-    qrdata: str = Form(...), 
-    title: str = Form(...),
-    qr_color: str = Form("#000000"),
-    text_color: str = Form("#000000")
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    
-    try:
-        # Сохраняем цвета в формате JSON
-        colors_json = json.dumps({
-            "qr_color": qr_color,
-            "bg_color": "#FFFFFF",
-            "text_color": text_color
-        })
-
-        # Обновляем данные в БД
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE qr_codes SET title = ?, data = ?, colors = ? WHERE id = ?",
-                (title, qrdata, colors_json, qr_id)
-            )
-            await db.commit()
-            
-            # Получаем имя файла для перегенерации QR-кода
-            cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
-            row = await cursor.fetchone()
-            filename = row[0] if row else None
-
-        # Если есть файл, перегенерируем QR-код
-        if filename:
-            filepath = os.path.join(QR_FOLDER, filename)
-            
-            # Генерируем QR-код
-            scan_url = f"{BASE_URL}/scan/{qr_id}"
-            
-            # Создаем QR-код с выбранными цветами
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data(scan_url)
-            qr.make(fit=True)
-            
-            # Создаем изображение QR-кода с белым фоном
-            qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
-            
-            # Добавляем текст поверх QR-кода
-            try:
-                font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
-            except IOError:
-                font = ImageFont.load_default()
-            
-            # Разбиваем текст на строки
-            max_chars_per_line = 20
-            wrapped_text = textwrap.fill(title, width=max_chars_per_line)
-            lines = wrapped_text.split('\n')
-            
-            # Рассчитываем высоту текста
-            line_height = 30
-            text_height = len(lines) * line_height + 20
-            
-            # Создаем новое изображение с белым фоном
-            new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
-            new_img.paste(qr_img, (0, text_height))
-            
-            # Рисуем текст
-            draw = ImageDraw.Draw(new_img)
-            y = 10
-            for line in lines:
-                text_bbox = draw.textbbox((0, 0), line, font=font)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_x = (new_img.width - text_width) // 2
-                draw.text((text_x, y), line, font=font, fill=text_color)
-                y += line_height
-            
-            # Сохраняем изображение
-            new_img.save(filepath)
-
-        return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
-    
-    except Exception as e:
-        logger.error(f"Ошибка при обновлении QR-кода: {e}")
-        return RedirectResponse(url=f"/dashboard/qr/edit/{qr_id}", status_code=303)
-
-# --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ ---
-async def check_user(request: Request):
-    user = await get_current_user(request)
-    if isinstance(user, dict):
-        # Пользователь заблокирован или заморожен
-        return templates.TemplateResponse("user_blocked.html", {
-            "request": request,
-            "message": user["message"]
-        })
-    if not user:
-        return RedirectResponse(url="/user/login", status_code=303)
-    return user
-
-@app.get("/user/dashboard", response_class=HTMLResponse)
-async def user_dashboard(request: Request):
-    user_resp = await check_user(request)
-    if not isinstance(user_resp, tuple):
-        return user_resp
-    
-    return templates.TemplateResponse("user_dashboard.html", {
-        "request": request,
-        "user": user_resp
-    })
-
-# --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для админа) ---
+# --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (админ) ---
 @app.get("/dashboard/users", response_class=HTMLResponse)
 async def users_management(request: Request):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM users ORDER BY id DESC")
+            cursor = await db.execute("""
+                SELECT id, username, role, is_active, created_at, last_login, 
+                       is_blocked, frozen_until, block_count, ip_address 
+                FROM users ORDER BY id DESC
+            """)
             users_list = await cursor.fetchall()
         
         return templates.TemplateResponse("users.html", {
             "request": request,
             "active": "users",
-            "users_list": users_list
+            "users_list": users_list,
+            "user": user
         })
     except Exception as e:
         logger.error(f"Ошибка при загрузке пользователей: {e}")
@@ -683,22 +602,28 @@ async def users_management(request: Request):
             "request": request,
             "active": "users",
             "users_list": [],
+            "user": user,
             "error": "Ошибка при загрузке данных"
         })
 
-# --- ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ---
+# --- ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (админ) ---
 @app.post("/dashboard/users/add")
-async def add_user(request: Request, username: str = Form(...), password: str = Form(...)):
+async def add_user(
+    request: Request, 
+    username: str = Form(...), 
+    password: str = Form(...),
+    role: str = Form("user")
+):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         password_hash = get_password_hash(password)
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, 'user', ?)",
-                (username, password_hash, datetime.now().isoformat())
+                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+                (username, password_hash, role, datetime.now().isoformat())
             )
             await db.commit()
     except Exception as e:
@@ -706,35 +631,59 @@ async def add_user(request: Request, username: str = Form(...), password: str = 
     
     return RedirectResponse(url="/dashboard/users", status_code=303)
 
-# --- БЛОКИРОВКА/РАЗБЛОКИРОВКА ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/dashboard/users/block/{user_id}")
-async def block_user(request: Request, user_id: int):
+# --- БЛОКИРОВКА ПОЛЬЗОВАТЕЛЯ С ВЫБОРОМ ВРЕМЕНИ ---
+@app.post("/dashboard/users/block/{user_id}")
+async def block_user(
+    request: Request, 
+    user_id: int,
+    block_type: str = Form(...),
+    block_duration: str = Form("1"),
+    block_unit: str = Form("hours")
+):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET is_blocked = 1, frozen_until = NULL WHERE id = ? AND role != 'admin'",
-                (user_id,)
-            )
+            if block_type == "permanent":
+                # Перманентная блокировка
+                await db.execute(
+                    "UPDATE users SET is_blocked = 1, frozen_until = NULL, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
+                    (user_id,)
+                )
+            else:
+                # Временная блокировка
+                duration = int(block_duration)
+                if block_unit == "hours":
+                    freeze_until = datetime.now() + timedelta(hours=duration)
+                elif block_unit == "days":
+                    freeze_until = datetime.now() + timedelta(days=duration)
+                else:  # weeks
+                    freeze_until = datetime.now() + timedelta(weeks=duration)
+                
+                await db.execute(
+                    "UPDATE users SET is_blocked = 0, frozen_until = ?, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
+                    (freeze_until.strftime("%Y-%m-%d %H:%M:%S"), user_id)
+                )
+            
             await db.commit()
     except Exception as e:
         logger.error(f"Ошибка при блокировке пользователя: {e}")
     
     return RedirectResponse(url="/dashboard/users", status_code=303)
 
+# --- РАЗБЛОКИРОВКА ПОЛЬЗОВАТЕЛЯ ---
 @app.get("/dashboard/users/unblock/{user_id}")
 async def unblock_user(request: Request, user_id: int):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                "UPDATE users SET is_blocked = 0 WHERE id = ?",
+                "UPDATE users SET is_blocked = 0, frozen_until = NULL WHERE id = ?",
                 (user_id,)
             )
             await db.commit()
@@ -743,96 +692,247 @@ async def unblock_user(request: Request, user_id: int):
     
     return RedirectResponse(url="/dashboard/users", status_code=303)
 
-# --- ЗАМОРОЗКА/РАЗМОРОЗКА ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/dashboard/users/freeze/{user_id}")
-async def freeze_user(request: Request, user_id: int):
+# --- УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ---
+@app.get("/dashboard/users/delete/{user_id}")
+async def delete_user(request: Request, user_id: int):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
-        # Заморозка на 7 дней
-        freeze_until = (datetime.now() + timedelta(days=7)).isoformat()
+        async with aiosqlite.connect(DB_PATH) as db:
+            # Нельзя удалить администратора
+            cursor = await db.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+            user_role = await cursor.fetchone()
+            
+            if user_role and user_role[0] != "admin":
+                await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                await db.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при удалении пользователя: {e}")
+    
+    return RedirectResponse(url="/dashboard/users", status_code=303)
+
+# --- БЛОКИРОВКА IP ---
+@app.post("/dashboard/ip/block")
+async def block_ip(
+    request: Request,
+    ip_address: str = Form(...),
+    reason: str = Form(""),
+    block_type: str = Form(...),
+    block_duration: str = Form("1"),
+    block_unit: str = Form("hours")
+):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        # Валидация IP-адреса
+        ipaddress.ip_address(ip_address)
         
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET frozen_until = ?, is_blocked = 0 WHERE id = ? AND role != 'admin'",
-                (freeze_until, user_id)
-            )
+            if block_type == "permanent":
+                await db.execute(
+                    "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, NULL, ?)",
+                    (ip_address, reason, datetime.now().isoformat())
+                )
+            else:
+                duration = int(block_duration)
+                if block_unit == "hours":
+                    blocked_until = datetime.now() + timedelta(hours=duration)
+                elif block_unit == "days":
+                    blocked_until = datetime.now() + timedelta(days=duration)
+                else:  # weeks
+                    blocked_until = datetime.now() + timedelta(weeks=duration)
+                
+                await db.execute(
+                    "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, ?, ?)",
+                    (ip_address, reason, blocked_until.strftime("%Y-%m-%d %H:%M:%S"), datetime.now().isoformat())
+                )
+            
+            await db.commit()
+    except ValueError:
+        return RedirectResponse(url="/dashboard/ip?error=invalid_ip", status_code=303)
+    except Exception as e:
+        logger.error(f"Ошибка при блокировке IP: {e}")
+    
+    return RedirectResponse(url="/dashboard/ip", status_code=303)
+
+# --- РАЗБЛОКИРОВКА IP ---
+@app.get("/dashboard/ip/unblock/{ip_address}")
+async def unblock_ip(request: Request, ip_address: str):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM blocked_ips WHERE ip_address = ?", (ip_address,))
             await db.commit()
     except Exception as e:
-        logger.error(f"Ошибка при заморозке пользователя: {e}")
+        logger.error(f"Ошибка при разблокировке IP: {e}")
     
-    return RedirectResponse(url="/dashboard/users", status_code=303)
+    return RedirectResponse(url="/dashboard/ip", status_code=303)
 
-@app.get("/dashboard/users/unfreeze/{user_id}")
-async def unfreeze_user(request: Request, user_id: int):
+# --- УПРАВЛЕНИЕ IP (админ) ---
+@app.get("/dashboard/ip", response_class=HTMLResponse)
+async def ip_management(request: Request):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM blocked_ips ORDER BY created_at DESC")
+            ip_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("ip_management.html", {
+            "request": request,
+            "active": "ip",
+            "ip_list": ip_list,
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке IP: {e}")
+        return templates.TemplateResponse("ip_management.html", {
+            "request": request,
+            "active": "ip",
+            "ip_list": [],
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ ---
+@app.get("/user/dashboard", response_class=HTMLResponse)
+async def user_dashboard(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("user_dashboard.html", {
+        "request": request,
+        "user": user,
+        "active": "dashboard"
+    })
+
+# --- НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ ---
+@app.get("/user/settings", response_class=HTMLResponse)
+async def user_settings(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("user_settings.html", {
+        "request": request,
+        "user": user,
+        "active": "settings"
+    })
+
+# --- СМЕНА ТЕМЫ ---
+@app.post("/user/settings/theme")
+async def change_theme(request: Request, theme: str = Form(...)):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                "UPDATE users SET frozen_until = NULL WHERE id = ?",
-                (user_id,)
+                "UPDATE users SET theme = ? WHERE id = ?",
+                (theme, user[0])
             )
             await db.commit()
+        
+        # Обновляем данные пользователя в сессии
+        user_data = list(user)
+        user_data[10] = theme  # theme field
+        request.session["user_theme"] = theme
+        
     except Exception as e:
-        logger.error(f"Ошибка при разморозке пользователя: {e}")
+        logger.error(f"Ошибка при смене темы: {e}")
     
-    return RedirectResponse(url="/dashboard/users", status_code=303)
+    return RedirectResponse(url="/user/settings", status_code=303)
 
-# --- АКТИВАЦИЯ/ДЕАКТИВАЦИЯ ---
-@app.get("/dashboard/users/activate/{user_id}")
-async def activate_user(request: Request, user_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+# --- ЗАГРУЗКА ЛОГОТИПА ---
+@app.post("/user/settings/upload_logo")
+async def upload_logo(request: Request, logo: UploadFile = File(...)):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
+        # Проверяем тип файла
+        if not logo.content_type.startswith('image/'):
+            return RedirectResponse(url="/user/settings?error=invalid_file", status_code=303)
+        
+        # Генерируем уникальное имя файла
+        file_extension = logo.filename.split('.')[-1]
+        filename = f"{user[0]}_{uuid.uuid4()}.{file_extension}"
+        filepath = os.path.join(LOGOS_FOLDER, filename)
+        
+        # Сохраняем файл
+        with open(filepath, "wb") as buffer:
+            content = await logo.read()
+            buffer.write(content)
+        
+        # Обновляем базу данных
+        logo_url = f"/static/logos/{filename}"
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                "UPDATE users SET is_active = 1, is_blocked = 0, frozen_until = NULL WHERE id = ? AND role != 'admin'",
-                (user_id,)
+                "UPDATE users SET logo_url = ? WHERE id = ?",
+                (logo_url, user[0])
             )
             await db.commit()
+        
     except Exception as e:
-        logger.error(f"Ошибка при активации пользователя: {e}")
+        logger.error(f"Ошибка при загрузке логотипа: {e}")
+        return RedirectResponse(url="/user/settings?error=upload_failed", status_code=303)
     
-    return RedirectResponse(url="/dashboard/users", status_code=303)
+    return RedirectResponse(url="/user/settings", status_code=303)
 
-@app.get("/dashboard/users/deactivate/{user_id}")
-async def deactivate_user(request: Request, user_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+# --- СВЯЗЬ С ПОДДЕРЖКОЙ ---
+@app.get("/user/contact", response_class=HTMLResponse)
+async def user_contact(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET is_active = 0 WHERE id = ? AND role != 'admin'",
-                (user_id,)
-            )
-            await db.commit()
-    except Exception as e:
-        logger.error(f"Ошибка при деактивации пользователя: {e}")
-    
-    return RedirectResponse(url="/dashboard/users", status_code=303)
+    return templates.TemplateResponse("user_contact.html", {
+        "request": request,
+        "user": user,
+        "active": "contact"
+    })
 
-# --- МОДУЛИ ---
+# --- МОДУЛИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ---
+@app.get("/user/modules", response_class=HTMLResponse)
+async def user_modules(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("user_modules.html", {
+        "request": request,
+        "user": user,
+        "active": "modules"
+    })
+
+# --- ОСТАЛЬНЫЕ МАРШРУТЫ ДЛЯ АДМИНА ---
 @app.get("/dashboard/modules", response_class=HTMLResponse)
 async def modules(request: Request):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
-    return templates.TemplateResponse("modules.html", {"request": request, "active": "modules"})
+    return templates.TemplateResponse("modules.html", {
+        "request": request, 
+        "active": "modules",
+        "user": user
+    })
 
-# --- СТАТИСТИКА ---
 @app.get("/dashboard/stats", response_class=HTMLResponse)
 async def stats(request: Request):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
     try:
@@ -846,7 +946,8 @@ async def stats(request: Request):
         return templates.TemplateResponse("stats.html", {
             "request": request,
             "active": "stats",
-            "stats_list": stats_list
+            "stats_list": stats_list,
+            "user": user
         })
     except Exception as e:
         logger.error(f"Ошибка при загрузке статистики: {e}")
@@ -854,74 +955,34 @@ async def stats(request: Request):
             "request": request,
             "active": "stats",
             "stats_list": [],
+            "user": user,
             "error": "Ошибка при загрузке статистики"
         })
 
-# --- НАСТРОЙКИ ---
 @app.get("/dashboard/settings", response_class=HTMLResponse)
 async def settings(request: Request):
     user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
-    return templates.TemplateResponse("settings.html", {"request": request, "active": "settings"})
+    return templates.TemplateResponse("settings.html", {
+        "request": request, 
+        "active": "settings",
+        "user": user
+    })
 
-# --- ВСЕ УСЛУГИ ---
-@app.get("/dashboard/services", response_class=HTMLResponse)
-async def all_services(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    return templates.TemplateResponse("services.html", {"request": request})
-
-@app.get("/dashboard/business", response_class=HTMLResponse)
-async def business_module(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    return templates.TemplateResponse("business.html", {"request": request})
-
-@app.get("/dashboard/cleaning", response_class=HTMLResponse)
-async def cleaning_services(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse):
-        return user
-    return templates.TemplateResponse("cleaning.html", {"request": request})
-
-# --- МАРШРУТЫ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ (только просмотр) ---
-@app.get("/user/modules", response_class=HTMLResponse)
-async def user_modules(request: Request):
-    user_resp = await check_user(request)
-    if not isinstance(user_resp, tuple):
-        return user_resp
-    return templates.TemplateResponse("user_modules.html", {"request": request})
-
-@app.get("/user/services", response_class=HTMLResponse)
-async def user_services(request: Request):
-    user_resp = await check_user(request)
-    if not isinstance(user_resp, tuple):
-        return user_resp
-    return templates.TemplateResponse("services.html", {"request": request})
-
-@app.get("/user/business", response_class=HTMLResponse)
-async def user_business(request: Request):
-    user_resp = await check_user(request)
-    if not isinstance(user_resp, tuple):
-        return user_resp
-    return templates.TemplateResponse("business.html", {"request": request})
-
-@app.get("/user/cleaning", response_class=HTMLResponse)
-async def user_cleaning(request: Request):
-    user_resp = await check_user(request)
-    if not isinstance(user_resp, tuple):
-        return user_resp
-    return templates.TemplateResponse("cleaning.html", {"request": request})
-
-# --- СТРАНИЦА БЛОКИРОВКИ ---
+# --- СТРАНИЦЫ ОШИБОК ---
 @app.get("/user/blocked", response_class=HTMLResponse)
 async def user_blocked(request: Request):
     return templates.TemplateResponse("user_blocked.html", {"request": request})
 
+@app.get("/user/frozen", response_class=HTMLResponse)
+async def user_frozen(request: Request):
+    return templates.TemplateResponse("account_frozen.html", {"request": request})
+
+@app.get("/ip/blocked", response_class=HTMLResponse)
+async def ip_blocked(request: Request):
+    return templates.TemplateResponse("ip_blocked.html", {"request": request})
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
