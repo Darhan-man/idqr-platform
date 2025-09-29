@@ -42,9 +42,8 @@ DB_PATH = "qr_data.db"
 ADMIN_CODE = "admin1990"
 BASE_URL = "https://idqr-platform.onrender.com"
 
-# Настройка безопасности
-security = HTTPBasic()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Настройка безопасности - используем argon2 вместо bcrypt чтобы избежать ограничения длины
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # Создаем папки если они не существуют
 os.makedirs(QR_FOLDER, exist_ok=True)
@@ -102,10 +101,11 @@ async def startup():
             """)
             
             # Создаем администратора по умолчанию
+            admin_password = "admin123"
             await db.execute("""
                 INSERT OR IGNORE INTO users (username, password_hash, role, created_at) 
                 VALUES (?, ?, ?, ?)
-            """, ("admin", pwd_context.hash("admin123"), "admin", datetime.now().isoformat()))
+            """, ("admin", pwd_context.hash(admin_password), "admin", datetime.now().isoformat()))
             
             await db.commit()
             logger.info("База данных инициализирована")
@@ -117,6 +117,9 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
+    # Обрезаем пароль до 72 символов для совместимости
+    if len(password) > 72:
+        password = password[:72]
     return pwd_context.hash(password)
 
 async def check_ip_blocked(ip_address: str) -> bool:
