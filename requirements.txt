@@ -25,3 +25,4 @@ ipaddress
 cryptography
 aiofiles
 itsdangerous
+argon2_cffi
