@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.middleware import Middleware
+from starlette.middleware.sessions import SessionMiddleware
 import qrcode
 import os
 import uuid
@@ -21,7 +23,15 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+# Секретный ключ для сессий (в продакшене должен быть в переменных окружения)
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-change-in-production")
+
+# Создаем middleware для сессий
+middleware = [
+    Middleware(SessionMiddleware, secret_key=SECRET_KEY)
+]
+
+app = FastAPI(middleware=middleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -194,45 +204,49 @@ async def authenticate_user(username: str, password: str, ip_address: str):
         return None
 
 async def get_current_user(request: Request):
-    user_id = request.session.get("user_id")
-    client_ip = request.client.host
-    
-    # Проверяем блокировку IP
-    if await check_ip_blocked(client_ip):
-        return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
-    
-    if user_id:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-            user = await cursor.fetchone()
+    try:
+        user_id = request.session.get("user_id")
+        client_ip = request.client.host
         
-        if user:
-            # Проверка статуса пользователя
-            if user[7]:  # is_blocked
-                return {"error": "blocked", "message": "Ваш аккаунт заблокирован за нарушения"}
+        # Проверяем блокировку IP
+        if await check_ip_blocked(client_ip):
+            return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
+        
+        if user_id:
+            async with aiosqlite.connect(DB_PATH) as db:
+                cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+                user = await cursor.fetchone()
             
-            if user[8]:  # frozen_until
-                freeze_until = datetime.fromisoformat(user[8])
-                if datetime.now() < freeze_until:
-                    return {
-                        "error": "frozen", 
-                        "message": f"Ваш аккаунт заморожен за нарушения. Разблокировка через: {freeze_until.strftime('%d.%m.%Y %H:%M')}"
-                    }
-                else:
-                    # Автоматическая разморозка
-                    async with aiosqlite.connect(DB_PATH) as db:
-                        await db.execute(
-                            "UPDATE users SET frozen_until = NULL WHERE id = ?",
-                            (user[0],)
-                        )
-                        await db.commit()
-            
-            if not user[4]:  # is_active
-                return {"error": "inactive", "message": "Ваш аккаунт деактивирован"}
-            
-            return user
-    
-    return None
+            if user:
+                # Проверка статуса пользователя
+                if user[7]:  # is_blocked
+                    return {"error": "blocked", "message": "Ваш аккаунт заблокирован за нарушения"}
+                
+                if user[8]:  # frozen_until
+                    freeze_until = datetime.fromisoformat(user[8])
+                    if datetime.now() < freeze_until:
+                        return {
+                            "error": "frozen", 
+                            "message": f"Ваш аккаунт заморожен за нарушения. Разблокировка через: {freeze_until.strftime('%d.%m.%Y %H:%M')}"
+                        }
+                    else:
+                        # Автоматическая разморозка
+                        async with aiosqlite.connect(DB_PATH) as db:
+                            await db.execute(
+                                "UPDATE users SET frozen_until = NULL WHERE id = ?",
+                                (user[0],)
+                            )
+                            await db.commit()
+                
+                if not user[4]:  # is_active
+                    return {"error": "inactive", "message": "Ваш аккаунт деактивирован"}
+                
+                return user
+        
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка в get_current_user: {e}")
+        return None
 
 def get_client_ip(request: Request):
     return request.client.host
@@ -334,6 +348,7 @@ async def login(request: Request, code: str = Form(...)):
         
         if admin_user:
             request.session["user_id"] = admin_user[0]
+            request.session["user_role"] = admin_user[3]
             return RedirectResponse(url="/dashboard/qr", status_code=303)
     
     return templates.TemplateResponse("index.html", {
@@ -631,7 +646,7 @@ async def add_user(
     
     return RedirectResponse(url="/dashboard/users", status_code=303)
 
-# --- БЛОКИРОВКА ПОЛЬЗОВАТЕЛЯ С ВЫБОРОМ ВРЕМЕНИ ---
+# --- БЛОКИРОВКА/ЗАМОРОЗКА ПОЛЬЗОВАТЕЛЯ С ВЫБОРОМ ВРЕМЕНИ ---
 @app.post("/dashboard/users/block/{user_id}")
 async def block_user(
     request: Request, 
@@ -653,7 +668,7 @@ async def block_user(
                     (user_id,)
                 )
             else:
-                # Временная блокировка
+                # Временная блокировка (заморозка)
                 duration = int(block_duration)
                 if block_unit == "hours":
                     freeze_until = datetime.now() + timedelta(hours=duration)
