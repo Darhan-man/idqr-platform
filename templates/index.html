@@ -382,6 +382,30 @@
             transform: translateY(-2px);
         }
 
+        .user-hint {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(0, 201, 167, 0.1);
+            border-radius: 12px;
+            border-left: 4px solid var(--success);
+        }
+
+        .user-hint p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-hint a {
+            color: var(--success);
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
         .error {
             color: var(--error);
             margin-top: 1rem;
@@ -393,6 +417,21 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+        }
+
+        .register-link {
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .register-link a {
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-weight: 500;
         }
 
         .particles {
@@ -529,6 +568,22 @@
                     <i class="fas fa-user"></i> Войти как пользователь
                 </a>
             </div>
+
+            <div class="register-link">
+                <a href="/register">
+                    <i class="fas fa-user-plus"></i> Зарегистрироваться
+                </a>
+            </div>
+
+            {% if show_user_hint or not error %}
+            <div class="user-hint">
+                <p><strong>Подсказка:</strong></p>
+                <p>Если вы пользователь, пожалуйста выберите вход для пользователей.</p>
+                <a href="/user/login">
+                    <i class="fas fa-arrow-right"></i> Перейти к входу для пользователей
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
 
