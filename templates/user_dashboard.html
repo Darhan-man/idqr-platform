@@ -123,6 +123,25 @@
             transform: translateY(-2px);
         }
 
+        .role-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-ip {
+            background: var(--secondary);
+        }
+
+        .role-admin {
+            background: var(--primary);
+        }
+
         .container {
             max-width: 1200px;
             margin: 2rem auto;
@@ -221,21 +240,6 @@
             opacity: 1;
         }
 
-        .role-badge {
-            display: inline-block;
-            background: var(--accent);
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-left: 0.5rem;
-        }
-
-        .role-ip {
-            background: var(--secondary);
-        }
-
         .particles {
             position: fixed;
             top: 0;
@@ -295,7 +299,7 @@
         }
     </style>
 </head>
-<body>
+<body data-theme="{{ user[10] if user else 'light' }}">
     <div class="particles" id="particles"></div>
     
     <div class="navbar">
@@ -305,6 +309,8 @@
                 Добро пожаловать, {{ user[1] }}!
                 {% if user[3] == 'ip' %}
                     <span class="role-badge role-ip">ИП</span>
+                {% elif user[3] == 'admin' %}
+                    <span class="role-badge role-admin">Admin</span>
                 {% endif %}
             </span>
             <a href="/logout" class="logout-btn">
@@ -321,6 +327,8 @@
             <p class="info-text">
                 {% if user[3] == 'ip' %}
                     Вы вошли как индивидуальный предприниматель. У вас есть доступ к созданию QR-кодов и всем модулям.
+                {% elif user[3] == 'admin' %}
+                    Вы вошли как администратор. У вас есть полный доступ ко всем функциям системы.
                 {% else %}
                     Вы вошли как обычный пользователь. Доступен только просмотр модулей без возможности редактирования.
                 {% endif %}
@@ -341,7 +349,7 @@
                 <i class="fas fa-soap"></i> Уборка и гигиена
             </a>
             
-            {% if user[3] == 'ip' %}
+            {% if user[3] in ['ip', 'admin'] %}
             <a href="/dashboard/qr" class="module-button">
                 <i class="fas fa-qrcode"></i> Создание QR-кодов
             </a>
@@ -376,6 +384,12 @@
                 particle.style.animationDelay = `-${Math.random() * 20}s`;
                 
                 particlesContainer.appendChild(particle);
+            }
+
+            // Применяем тему из localStorage при загрузке
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
             }
         });
     </script>

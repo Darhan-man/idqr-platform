@@ -277,6 +277,25 @@
             color: var(--text-primary);
         }
 
+        .role-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-ip {
+            background: var(--secondary);
+        }
+
+        .role-admin {
+            background: var(--primary);
+        }
+
         .particles {
             position: fixed;
             top: 0;
@@ -339,7 +358,7 @@
         }
     </style>
 </head>
-<body>
+<body data-theme="{{ user[10] if user else 'light' }}">
     <div class="particles" id="particles"></div>
     
     <div class="navbar">
@@ -419,8 +438,10 @@
                             Обычный пользователь
                         {% elif user[3] == 'ip' %}
                             Индивидуальный предприниматель
+                            <span class="role-badge role-ip">ИП</span>
                         {% else %}
                             Администратор
+                            <span class="role-badge role-admin">Admin</span>
                         {% endif %}
                     </div>
                 </div>
@@ -470,6 +491,12 @@
                     this.querySelector('input[type="radio"]').checked = true;
                 });
             });
+
+            // Применяем тему из localStorage при загрузке
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
         });
     </script>
 </body>

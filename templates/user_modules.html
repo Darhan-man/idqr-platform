@@ -296,7 +296,7 @@
         }
     </style>
 </head>
-<body>
+<body data-theme="{{ user[10] if user else 'light' }}">
     <div class="particles" id="particles"></div>
     
     <div class="navbar">
@@ -331,9 +331,6 @@
             <h3 class="category-title"><i class="fas fa-building"></i> Бизнес и коммерция</h3>
             <div class="modules-grid">
                 <a href="/user/business" class="module-button"><i class="fas fa-store"></i> Бизнес и магазины</a>
-                {% if user[3] == 'ip' %}
-                <a href="/dashboard/qr" class="module-button"><i class="fas fa-qrcode"></i> Создание QR-кодов</a>
-                {% endif %}
             </div>
         </div>
 
@@ -458,6 +455,12 @@
                 particle.style.animationDelay = `-${Math.random() * 20}s`;
                 
                 particlesContainer.appendChild(particle);
+            }
+
+            // Применяем тему из localStorage при загрузке
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
             }
         });
     </script>
