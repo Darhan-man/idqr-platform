@@ -536,10 +536,42 @@ async def generate_qr(
         
         new_img.save(filepath)
 
-        return RedirectResponse(url=f"/dashboard/qr/view/{qr_id}", status_code=303)
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
     
     except Exception as e:
         logger.error(f"Ошибка при генерации QR-кода: {e}")
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+
+# --- Просмотр QR кода ---
+@app.get("/dashboard/qr/view/{qr_id}", response_class=HTMLResponse)
+async def view_qr(request: Request, qr_id: int):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
+            qr_code = await cursor.fetchone()
+            
+            if not qr_code:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+                
+            # Проверяем права доступа
+            if user[3] != "admin" and qr_code[8] != user[0]:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+                
+            qr_url = f"/static/qr/{qr_code[3]}"
+            
+            return templates.TemplateResponse("view_qr.html", {
+                "request": request,
+                "qr_code": qr_code,
+                "qr_url": qr_url,
+                "active": "qr",
+                "user": user
+            })
+    except Exception as e:
+        logger.error(f"Ошибка при просмотре QR-кода: {e}")
         return RedirectResponse(url="/dashboard/qr", status_code=303)
 
 # --- СКАНИРОВАНИЕ QR ---
@@ -709,7 +741,7 @@ async def block_user(
                 
                 await db.execute(
                     "UPDATE users SET is_blocked = 0, frozen_until = ?, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
-                    (freeze_until.strftime("%Y-%m-%d %H:%M:%S"), user_id)
+                    (freeze_until.isoformat(), user_id)
                 )
             
             await db.commit()
@@ -793,7 +825,7 @@ async def block_ip(
                 
                 await db.execute(
                     "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, ?, ?)",
-                    (ip_address, reason, blocked_until.strftime("%Y-%m-%d %H:%M:%S"), datetime.now().isoformat())
+                    (ip_address, reason, blocked_until.isoformat(), datetime.now().isoformat())
                 )
             
             await db.commit()
