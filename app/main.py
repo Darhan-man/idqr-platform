@@ -574,6 +574,129 @@ async def view_qr(request: Request, qr_id: int):
         logger.error(f"Ошибка при просмотре QR-кода: {e}")
         return RedirectResponse(url="/dashboard/qr", status_code=303)
 
+# --- Редактирование QR кода ---
+@app.get("/dashboard/qr/edit/{qr_id}", response_class=HTMLResponse)
+async def edit_qr_page(request: Request, qr_id: int):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
+            qr_code = await cursor.fetchone()
+            
+            if not qr_code:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+                
+            # Проверяем права доступа
+            if user[3] != "admin" and qr_code[8] != user[0]:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+            
+            # Получаем цвета
+            colors = json.loads(qr_code[7]) if qr_code[7] else {"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000"}
+            
+            return templates.TemplateResponse("edit_qr.html", {
+                "request": request,
+                "qr_code": qr_code,
+                "colors": colors,
+                "active": "qr",
+                "user": user
+            })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке формы редактирования QR-кода: {e}")
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+
+# --- Обновление QR кода ---
+@app.post("/dashboard/qr/update/{qr_id}")
+async def update_qr(
+    request: Request, 
+    qr_id: int,
+    title: str = Form(...),
+    qrdata: str = Form(...),
+    qr_color: str = Form("#000000"),
+    text_color: str = Form("#000000")
+):
+    user = await check_ip_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        # Получаем старый QR-код
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
+            old_qr = await cursor.fetchone()
+            
+            if not old_qr:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+                
+            # Проверяем права доступа
+            if user[3] != "admin" and old_qr[8] != user[0]:
+                return RedirectResponse(url="/dashboard/qr", status_code=303)
+            
+            # Обновляем данные в БД
+            colors_json = json.dumps({
+                "qr_color": qr_color,
+                "bg_color": "#FFFFFF",
+                "text_color": text_color
+            })
+            
+            await db.execute(
+                "UPDATE qr_codes SET title = ?, data = ?, colors = ? WHERE id = ?",
+                (title, qrdata, colors_json, qr_id)
+            )
+            await db.commit()
+        
+        # Перегенерируем QR-код
+        filename = old_qr[3]
+        filepath = os.path.join(QR_FOLDER, filename)
+        
+        scan_url = f"{BASE_URL}/scan/{qr_id}"
+        
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(scan_url)
+        qr.make(fit=True)
+        
+        qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
+        
+        # Добавляем текст
+        try:
+            font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
+        except IOError:
+            font = ImageFont.load_default()
+        
+        max_chars_per_line = 20
+        wrapped_text = textwrap.fill(title, width=max_chars_per_line)
+        lines = wrapped_text.split('\n')
+        
+        line_height = 30
+        text_height = len(lines) * line_height + 20
+        
+        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
+        new_img.paste(qr_img, (0, text_height))
+        
+        draw = ImageDraw.Draw(new_img)
+        y = 10
+        for line in lines:
+            text_bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_x = (new_img.width - text_width) // 2
+            draw.text((text_x, y), line, font=font, fill=text_color)
+            y += line_height
+        
+        new_img.save(filepath)
+
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+    
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении QR-кода: {e}")
+        return RedirectResponse(url="/dashboard/qr", status_code=303)
+
 # --- СКАНИРОВАНИЕ QR ---
 @app.get("/scan/{qr_id}")
 async def scan_qr(qr_id: int):
@@ -990,6 +1113,43 @@ async def user_modules(request: Request):
         "request": request,
         "user": user,
         "active": "modules"
+    })
+
+# --- ПОДМОДУЛИ ---
+@app.get("/user/business", response_class=HTMLResponse)
+async def user_business(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("business.html", {
+        "request": request,
+        "user": user,
+        "active": "business"
+    })
+
+@app.get("/user/services", response_class=HTMLResponse)
+async def user_services(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("services.html", {
+        "request": request,
+        "user": user,
+        "active": "services"
+    })
+
+@app.get("/user/cleaning", response_class=HTMLResponse)
+async def user_cleaning(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("cleaning.html", {
+        "request": request,
+        "user": user,
+        "active": "cleaning"
     })
 
 # --- ОСТАЛЬНЫЕ МАРШРУТЫ ДЛЯ АДМИНА ---
