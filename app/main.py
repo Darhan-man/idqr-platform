@@ -263,8 +263,7 @@ async def register_page(request: Request):
 async def register(
     request: Request, 
     username: str = Form(...), 
-    password: str = Form(...),
-    role: str = Form("user")
+    password: str = Form(...)
 ):
     client_ip = get_client_ip(request)
     
@@ -287,13 +286,13 @@ async def register(
                     "error": "Пользователь с таким именем уже существует"
                 })
             
-            # Создаем пользователя
+            # Создаем пользователя с ролью 'user' по умолчанию
             password_hash = get_password_hash(password)
             created_at = datetime.now().isoformat()
             
             await db.execute(
                 "INSERT INTO users (username, password_hash, role, created_at, ip_address) VALUES (?, ?, ?, ?, ?)",
-                (username, password_hash, role, created_at, client_ip)
+                (username, password_hash, "user", created_at, client_ip)
             )
             await db.commit()
             
@@ -649,6 +648,34 @@ async def add_user(
     
     return RedirectResponse(url="/dashboard/users", status_code=303)
 
+# --- ИЗМЕНЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЯ (админ) ---
+@app.post("/dashboard/users/change_role/{user_id}")
+async def change_user_role(
+    request: Request, 
+    user_id: int,
+    new_role: str = Form(...)
+):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            # Нельзя менять роль администратора
+            cursor = await db.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+            current_role = await cursor.fetchone()
+            
+            if current_role and current_role[0] != "admin":
+                await db.execute(
+                    "UPDATE users SET role = ? WHERE id = ?",
+                    (new_role, user_id)
+                )
+                await db.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при изменении роли пользователя: {e}")
+    
+    return RedirectResponse(url="/dashboard/users", status_code=303)
+
 # --- БЛОКИРОВКА/ЗАМОРОЗКА ПОЛЬЗОВАТЕЛЯ С ВЫБОРОМ ВРЕМЕНИ ---
 @app.post("/dashboard/users/block/{user_id}")
 async def block_user(
@@ -863,8 +890,6 @@ async def change_theme(request: Request, theme: str = Form(...)):
             await db.commit()
         
         # Обновляем данные пользователя в сессии
-        user_data = list(user)
-        user_data[10] = theme  # theme field
         request.session["user_theme"] = theme
         
     except Exception as e:
