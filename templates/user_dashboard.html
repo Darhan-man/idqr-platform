@@ -221,6 +221,21 @@
             opacity: 1;
         }
 
+        .role-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-ip {
+            background: var(--secondary);
+        }
+
         .particles {
             position: fixed;
             top: 0;
@@ -286,7 +301,12 @@
     <div class="navbar">
         <h1><i class="fas fa-user"></i> IDQR: Панель пользователя</h1>
         <div class="user-info">
-            <span class="welcome">Добро пожаловать, {{ user[1] }}!</span>
+            <span class="welcome">
+                Добро пожаловать, {{ user[1] }}!
+                {% if user[3] == 'ip' %}
+                    <span class="role-badge role-ip">ИП</span>
+                {% endif %}
+            </span>
             <a href="/logout" class="logout-btn">
                 <i class="fas fa-sign-out-alt"></i> Выйти
             </a>
@@ -298,10 +318,19 @@
         
         <div class="info-card">
             <span class="info-icon"><i class="fas fa-info-circle"></i></span>
-            <p class="info-text">Вы вошли как обычный пользователь. Доступен только просмотр модулей без возможности редактирования.</p>
+            <p class="info-text">
+                {% if user[3] == 'ip' %}
+                    Вы вошли как индивидуальный предприниматель. У вас есть доступ к созданию QR-кодов и всем модулям.
+                {% else %}
+                    Вы вошли как обычный пользователь. Доступен только просмотр модулей без возможности редактирования.
+                {% endif %}
+            </p>
         </div>
 
         <div class="modules-grid">
+            <a href="/user/modules" class="module-button">
+                <i class="fas fa-puzzle-piece"></i> Все модули
+            </a>
             <a href="/user/services" class="module-button">
                 <i class="fas fa-home"></i> Услуги и быт
             </a>
@@ -311,8 +340,18 @@
             <a href="/user/cleaning" class="module-button">
                 <i class="fas fa-soap"></i> Уборка и гигиена
             </a>
-            <a href="/user/modules" class="module-button">
-                <i class="fas fa-puzzle-piece"></i> Все модули
+            
+            {% if user[3] == 'ip' %}
+            <a href="/dashboard/qr" class="module-button">
+                <i class="fas fa-qrcode"></i> Создание QR-кодов
+            </a>
+            {% endif %}
+            
+            <a href="/user/contact" class="module-button">
+                <i class="fas fa-headset"></i> Связь с поддержкой
+            </a>
+            <a href="/user/settings" class="module-button">
+                <i class="fas fa-cog"></i> Настройки
             </a>
         </div>
     </div>
