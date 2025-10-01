@@ -1482,6 +1482,43 @@ async def user_cleaning(request: Request):
         "active": "cleaning"
     })
 
+# --- ПОДМОДУЛИ ДЛЯ АДМИНА ---
+@app.get("/dashboard/business", response_class=HTMLResponse)
+async def admin_business(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("business.html", {
+        "request": request,
+        "user": user,
+        "active": "business"
+    })
+
+@app.get("/dashboard/services", response_class=HTMLResponse)
+async def admin_services(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("services.html", {
+        "request": request,
+        "user": user,
+        "active": "services"
+    })
+
+@app.get("/dashboard/cleaning", response_class=HTMLResponse)
+async def admin_cleaning(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("cleaning.html", {
+        "request": request,
+        "user": user,
+        "active": "cleaning"
+    })
+
 # --- ОСТАЛЬНЫЕ МАРШРУТЫ ДЛЯ АДМИНА ---
 @app.get("/dashboard/modules", response_class=HTMLResponse)
 async def modules(request: Request):
