@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR — Статистика системы</title>
+    <title>IDQR — Логи системы</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -194,14 +194,7 @@
             font-weight: 700;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
+        .logs-container {
             background: var(--card-bg);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -209,134 +202,117 @@
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             border: 1px solid var(--card-border);
-            text-align: center;
-            transition: var(--transition);
+            overflow-x: auto;
         }
 
-        .stat-card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-5px);
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
-        .stat-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            display: block;
+        .logs-table th,
+        .logs-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
         }
 
-        .stat-users .stat-icon { color: var(--primary); }
-        .stat-qr .stat-icon { color: var(--secondary); }
-        .stat-scans .stat-icon { color: var(--success); }
-        .stat-blocked .stat-icon { color: var(--error); }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-
-        .charts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .chart-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            border: 1px solid var(--card-border);
-        }
-
-        .chart-title {
+        .logs-table th {
+            background: rgba(108, 99, 255, 0.1);
+            font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 1.5rem;
-            font-size: 1.3rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            position: sticky;
+            top: 0;
         }
 
-        .roles-list {
-            list-style: none;
+        .logs-table tr:hover {
+            background: rgba(108, 99, 255, 0.05);
         }
 
-        .role-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        .role-item:last-child {
-            border-bottom: none;
-        }
-
-        .role-name {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 500;
-        }
-
-        .role-count {
-            background: var(--primary);
-            color: white;
+        .log-type {
             padding: 0.3rem 0.8rem;
             border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .recent-qr {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .qr-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        .qr-item:last-child {
-            border-bottom: none;
-        }
-
-        .qr-info {
-            flex: 1;
-        }
-
-        .qr-title {
-            font-weight: 500;
-            margin-bottom: 0.3rem;
-        }
-
-        .qr-meta {
             font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .type-login {
+            background: rgba(0, 201, 167, 0.2);
+            color: var(--success);
+        }
+
+        .type-registration {
+            background: rgba(109, 223, 255, 0.2);
+            color: var(--info);
+        }
+
+        .type-qr_create {
+            background: rgba(108, 99, 255, 0.2);
+            color: var(--primary);
+        }
+
+        .type-qr_update {
+            background: rgba(255, 167, 38, 0.2);
+            color: var(--warning);
+        }
+
+        .type-qr_delete {
+            background: rgba(255, 107, 147, 0.2);
+            color: var(--error);
+        }
+
+        .type-user_add, .type-user_role_change, .type-user_block, .type-user_freeze, .type-user_unblock, .type-user_delete {
+            background: rgba(255, 100, 180, 0.2);
+            color: var(--secondary);
+        }
+
+        .type-system_settings_update {
+            background: rgba(0, 201, 167, 0.2);
+            color: var(--success);
+        }
+
+        .type-ip_block, .type-ip_unblock {
+            background: rgba(109, 223, 255, 0.2);
+            color: var(--info);
+        }
+
+        .type-logout, .type-theme_change, .type-logo_upload {
+            background: rgba(139, 139, 159, 0.2);
+            color: var(--gray);
+        }
+
+        .type-failed_login {
+            background: rgba(255, 107, 147, 0.2);
+            color: var(--error);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
             color: var(--text-secondary);
         }
 
-        .qr-scans {
-            background: var(--success);
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 0.8rem;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            min-width: 150px;
         }
 
         .particles {
@@ -379,12 +355,18 @@
                 font-size: 0.9rem;
             }
             
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .logs-container {
+                padding: 1rem;
+                overflow-x: auto;
             }
             
-            .charts-grid {
-                grid-template-columns: 1fr;
+            .logs-table {
+                font-size: 0.9rem;
+            }
+            
+            .logs-table th,
+            .logs-table td {
+                padding: 0.7rem 0.5rem;
             }
             
             .theme-switch {
@@ -415,16 +397,12 @@
                 padding: 0 1rem;
             }
             
-            .stats-grid {
-                grid-template-columns: 1fr;
+            .filters {
+                flex-direction: column;
             }
             
-            .stat-card {
-                padding: 1.5rem;
-            }
-            
-            .stat-number {
-                font-size: 2rem;
+            .filter-select {
+                width: 100%;
             }
         }
     </style>
@@ -433,14 +411,14 @@
     <div class="particles" id="particles"></div>
     
     <div class="navbar">
-        <h1><i class="fas fa-chart-bar"></i> IDQR: Статистика системы</h1>
+        <h1><i class="fas fa-clipboard-list"></i> IDQR: Логи системы</h1>
         <nav>
             <a href="/dashboard/qr"><i class="fas fa-qrcode"></i> QR-Коды</a>
             <a href="/dashboard/modules"><i class="fas fa-puzzle-piece"></i> Модули</a>
             <a href="/dashboard/users"><i class="fas fa-user"></i> Пользователи</a>
             <a href="/dashboard/ip"><i class="fas fa-network-wired"></i> IP-Блокировки</a>
-            <a href="/dashboard/stats" class="active"><i class="fas fa-chart-bar"></i> Статистика</a>
-            <a href="/dashboard/logs"><i class="fas fa-clipboard-list"></i> Логи</a>
+            <a href="/dashboard/stats"><i class="fas fa-chart-bar"></i> Статистика</a>
+            <a href="/dashboard/logs" class="active"><i class="fas fa-clipboard-list"></i> Логи</a>
             <a href="/dashboard/system"><i class="fas fa-cog"></i> Настройки</a>
         </nav>
         
@@ -456,95 +434,96 @@
     </div>
 
     <div class="container">
-        <h2><i class="fas fa-chart-line"></i> Общая статистика системы</h2>
+        <h2><i class="fas fa-history"></i> Логи действий системы</h2>
         
-        <div class="stats-grid">
-            <div class="stat-card stat-users">
-                <i class="fas fa-users stat-icon"></i>
-                <div class="stat-number">{{ total_users }}</div>
-                <div class="stat-label">Всего пользователей</div>
-            </div>
+        <div class="filters">
+            <select class="filter-select" id="typeFilter">
+                <option value="">Все типы действий</option>
+                <option value="login">Вход в систему</option>
+                <option value="failed_login">Неудачный вход</option>
+                <option value="logout">Выход из системы</option>
+                <option value="registration">Регистрация</option>
+                <option value="qr_create">Создание QR</option>
+                <option value="qr_update">Обновление QR</option>
+                <option value="qr_delete">Удаление QR</option>
+                <option value="user_add">Добавление пользователя</option>
+                <option value="user_role_change">Смена роли</option>
+                <option value="user_block">Блокировка пользователя</option>
+                <option value="user_freeze">Заморозка пользователя</option>
+                <option value="user_unblock">Разблокировка пользователя</option>
+                <option value="user_delete">Удаление пользователя</option>
+                <option value="system_settings_update">Изменение настроек</option>
+                <option value="ip_block">Блокировка IP</option>
+                <option value="ip_unblock">Разблокировка IP</option>
+                <option value="theme_change">Смена темы</option>
+                <option value="logo_upload">Загрузка логотипа</option>
+            </select>
             
-            <div class="stat-card stat-qr">
-                <i class="fas fa-qrcode stat-icon"></i>
-                <div class="stat-number">{{ total_qr }}</div>
-                <div class="stat-label">Создано QR-кодов</div>
-            </div>
-            
-            <div class="stat-card stat-scans">
-                <i class="fas fa-eye stat-icon"></i>
-                <div class="stat-number">{{ total_scans }}</div>
-                <div class="stat-label">Всего сканирований</div>
-            </div>
-            
-            <div class="stat-card stat-blocked">
-                <i class="fas fa-ban stat-icon"></i>
-                <div class="stat-number">{{ total_blocked_ips }}</div>
-                <div class="stat-label">Заблокированных IP</div>
-            </div>
+            <select class="filter-select" id="userFilter">
+                <option value="">Все пользователи</option>
+                {% for log in logs_list %}
+                    {% if log[5] and log[5] not in user_names %}
+                        {% set _ = user_names.append(log[5]) %}
+                        <option value="{{ log[5] }}">{{ log[5] }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
         </div>
 
-        <div class="charts-grid">
-            <div class="chart-card">
-                <div class="chart-title">
-                    <i class="fas fa-user-tag"></i> Распределение по ролям
-                </div>
-                <ul class="roles-list">
-                    {% for role in roles_stats %}
-                    <li class="role-item">
-                        <div class="role-name">
-                            {% if role[0] == 'admin' %}
-                                <i class="fas fa-crown"></i> Администраторы
-                            {% elif role[0] == 'ip' %}
-                                <i class="fas fa-briefcase"></i> Индивидуальные предприниматели
-                            {% else %}
-                                <i class="fas fa-user"></i> Обычные пользователи
-                            {% endif %}
-                        </div>
-                        <span class="role-count">{{ role[1] }}</span>
-                    </li>
+        <div class="logs-container">
+            {% if logs_list %}
+            <table class="logs-table">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Пользователь</th>
+                        <th>Тип действия</th>
+                        <th>Описание</th>
+                        <th>IP-адрес</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs_list %}
+                    <tr class="log-row" data-type="{{ log[2] }}" data-user="{{ log[5] or 'Система' }}">
+                        <td>{{ log[4][:19] if log[4] else 'Н/Д' }}</td>
+                        <td>{{ log[5] or 'Система' }}</td>
+                        <td>
+                            <span class="log-type type-{{ log[2] }}">
+                                {% if log[2] == 'login' %}Вход
+                                {% elif log[2] == 'failed_login' %}Неудачный вход
+                                {% elif log[2] == 'logout' %}Выход
+                                {% elif log[2] == 'registration' %}Регистрация
+                                {% elif log[2] == 'qr_create' %}Создание QR
+                                {% elif log[2] == 'qr_update' %}Обновление QR
+                                {% elif log[2] == 'qr_delete' %}Удаление QR
+                                {% elif log[2] == 'user_add' %}Добавление пользователя
+                                {% elif log[2] == 'user_role_change' %}Смена роли
+                                {% elif log[2] == 'user_block' %}Блокировка
+                                {% elif log[2] == 'user_freeze' %}Заморозка
+                                {% elif log[2] == 'user_unblock' %}Разблокировка
+                                {% elif log[2] == 'user_delete' %}Удаление пользователя
+                                {% elif log[2] == 'system_settings_update' %}Изменение настроек
+                                {% elif log[2] == 'ip_block' %}Блокировка IP
+                                {% elif log[2] == 'ip_unblock' %}Разблокировка IP
+                                {% elif log[2] == 'theme_change' %}Смена темы
+                                {% elif log[2] == 'logo_upload' %}Загрузка логотипа
+                                {% else %}{{ log[2] }}{% endif %}
+                            </span>
+                        </td>
+                        <td>{{ log[3] }}</td>
+                        <td>{{ log[4] if log[4] else 'Н/Д' }}</td>
+                    </tr>
                     {% endfor %}
-                </ul>
-            </div>
-            
-            <div class="chart-card">
-                <div class="chart-title">
-                    <i class="fas fa-history"></i> Последние QR-коды
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-clipboard-list"></i>
                 </div>
-                <div class="recent-qr">
-                    {% for qr in recent_qr %}
-                    <div class="qr-item">
-                        <div class="qr-info">
-                            <div class="qr-title">{{ qr[1] }}</div>
-                            <div class="qr-meta">
-                                {{ qr[4] }} • {{ qr[3][:10] }}
-                            </div>
-                        </div>
-                        <span class="qr-scans">{{ qr[2] }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
+                <p>Логи действий отсутствуют</p>
             </div>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-title">
-                <i class="fas fa-calendar-alt"></i> Статистика сканирований за 30 дней
-            </div>
-            <div style="padding: 1rem; text-align: center; color: var(--text-secondary);">
-                {% if scans_stats %}
-                    <p>Всего записей: {{ scans_stats|length }} дней</p>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-top: 1rem;">
-                        {% for stat in scans_stats %}
-                        <div style="background: var(--primary); color: white; padding: 0.5rem; border-radius: 8px; font-size: 0.8rem;">
-                            {{ stat[0] }}: {{ stat[1] }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p>Данные о сканированиях отсутствуют</p>
-                {% endif %}
-            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -602,6 +581,33 @@
             }
             
             toggleSwitch.addEventListener('change', switchTheme, false);
+            
+            // Фильтрация логов
+            const typeFilter = document.getElementById('typeFilter');
+            const userFilter = document.getElementById('userFilter');
+            const logRows = document.querySelectorAll('.log-row');
+            
+            function filterLogs() {
+                const selectedType = typeFilter.value;
+                const selectedUser = userFilter.value;
+                
+                logRows.forEach(row => {
+                    const rowType = row.getAttribute('data-type');
+                    const rowUser = row.getAttribute('data-user');
+                    
+                    const typeMatch = !selectedType || rowType === selectedType;
+                    const userMatch = !selectedUser || rowUser === selectedUser;
+                    
+                    if (typeMatch && userMatch) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+            
+            typeFilter.addEventListener('change', filterLogs);
+            userFilter.addEventListener('change', filterLogs);
         });
     </script>
 </body>
