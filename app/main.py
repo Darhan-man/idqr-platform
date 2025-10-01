@@ -100,12 +100,51 @@ async def startup():
                 )
             """)
             
+            # Таблица системных настроек
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    setting_key TEXT UNIQUE NOT NULL,
+                    setting_value TEXT NOT NULL,
+                    description TEXT,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            
+            # Таблица логов действий
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS action_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    action_type TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    ip_address TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            
             # Создаем администратора по умолчанию
             admin_password = "admin123"
             await db.execute("""
                 INSERT OR IGNORE INTO users (username, password_hash, role, created_at) 
                 VALUES (?, ?, ?, ?)
             """, ("admin", pwd_context.hash(admin_password), "admin", datetime.now().isoformat()))
+            
+            # Создаем базовые системные настройки
+            await db.execute("""
+                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
+                VALUES (?, ?, ?, ?)
+            """, ("site_name", "IDQR Platform", "Название сайта", datetime.now().isoformat()))
+            
+            await db.execute("""
+                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
+                VALUES (?, ?, ?, ?)
+            """, ("max_qr_per_user", "50", "Максимум QR-кодов на пользователя", datetime.now().isoformat()))
+            
+            await db.execute("""
+                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
+                VALUES (?, ?, ?, ?)
+            """, ("registration_enabled", "true", "Разрешена ли регистрация новых пользователей", datetime.now().isoformat()))
             
             await db.commit()
             logger.info("База данных инициализирована")
@@ -150,6 +189,18 @@ async def check_ip_blocked(ip_address: str) -> bool:
         logger.error(f"Ошибка при проверке IP: {e}")
     
     return False
+
+async def log_action(user_id: int, action_type: str, description: str, ip_address: str = None):
+    """Логирование действий пользователей"""
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO action_logs (user_id, action_type, description, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user_id, action_type, description, ip_address, datetime.now().isoformat())
+            )
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при логировании действия: {e}")
 
 async def authenticate_user(username: str, password: str, ip_address: str):
     try:
@@ -199,8 +250,13 @@ async def authenticate_user(username: str, password: str, ip_address: str):
                         (ip_address, datetime.now().isoformat(), user[0])
                     )
                     await db.commit()
+                
+                # Логируем вход
+                await log_action(user[0], "login", "Успешный вход в систему", ip_address)
                 return user
         
+        # Логируем неудачную попытку входа
+        await log_action(None, "failed_login", f"Неудачная попытка входа для пользователя {username}", ip_address)
         return None
     except Exception as e:
         logger.error(f"Ошибка аутентификации: {e}")
@@ -257,6 +313,21 @@ def get_client_ip(request: Request):
 # --- РЕГИСТРАЦИЯ ---
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
+    # Проверяем разрешена ли регистрация
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'")
+            result = await cursor.fetchone()
+            registration_enabled = result[0] == 'true' if result else True
+            
+        if not registration_enabled:
+            return templates.TemplateResponse("register.html", {
+                "request": request, 
+                "error": "Регистрация новых пользователей временно отключена"
+            })
+    except Exception as e:
+        logger.error(f"Ошибка при проверке настроек регистрации: {e}")
+    
     return templates.TemplateResponse("register.html", {"request": request})
 
 @app.post("/register")
@@ -273,6 +344,21 @@ async def register(
             "request": request, 
             "error": "Ваш IP-адрес заблокирован. Регистрация невозможна."
         })
+    
+    # Проверяем разрешена ли регистрация
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'")
+            result = await cursor.fetchone()
+            registration_enabled = result[0] == 'true' if result else True
+            
+        if not registration_enabled:
+            return templates.TemplateResponse("register.html", {
+                "request": request, 
+                "error": "Регистрация новых пользователей временно отключена"
+            })
+    except Exception as e:
+        logger.error(f"Ошибка при проверке настроек регистрации: {e}")
     
     try:
         # Проверяем существование пользователя
@@ -295,6 +381,13 @@ async def register(
                 (username, password_hash, "user", created_at, client_ip)
             )
             await db.commit()
+            
+            # Получаем ID нового пользователя
+            cursor = await db.execute("SELECT id FROM users WHERE username = ?", (username,))
+            new_user = await cursor.fetchone()
+            
+            # Логируем регистрацию
+            await log_action(new_user[0], "registration", "Новый пользователь зарегистрирован", client_ip)
             
         return RedirectResponse(url="/user/login", status_code=303)
         
@@ -351,6 +444,10 @@ async def login(request: Request, code: str = Form(...)):
         if admin_user:
             request.session["user_id"] = admin_user[0]
             request.session["user_role"] = admin_user[3]
+            
+            # Логируем вход администратора
+            await log_action(admin_user[0], "admin_login", "Вход администратора через код", get_client_ip(request))
+            
             return RedirectResponse(url="/dashboard/qr", status_code=303)
     
     return templates.TemplateResponse("index.html", {
@@ -393,6 +490,10 @@ async def user_login(request: Request, username: str = Form(...), password: str 
 # --- ВЫХОД ---
 @app.get("/logout")
 async def logout(request: Request):
+    user_id = request.session.get("user_id")
+    if user_id:
+        await log_action(user_id, "logout", "Выход из системы", get_client_ip(request))
+    
     request.session.clear()
     return RedirectResponse(url="/", status_code=303)
 
@@ -474,6 +575,23 @@ async def generate_qr(
         return user
     
     try:
+        # Проверяем лимит QR-кодов для пользователя
+        if user[3] != "admin":
+            async with aiosqlite.connect(DB_PATH) as db:
+                cursor = await db.execute("SELECT COUNT(*) FROM qr_codes WHERE user_id = ?", (user[0],))
+                qr_count = await cursor.fetchone()
+                
+                cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'max_qr_per_user'")
+                max_qr_result = await cursor.fetchone()
+                max_qr = int(max_qr_result[0]) if max_qr_result else 50
+                
+                if qr_count[0] >= max_qr:
+                    return templates.TemplateResponse("qr.html", {
+                        "request": request,
+                        "error": f"Превышен лимит QR-кодов. Максимум: {max_qr}",
+                        "user": user
+                    })
+        
         # Генерируем уникальное имя файла
         filename = f"{uuid.uuid4()}.png"
         filepath = os.path.join(QR_FOLDER, filename)
@@ -536,6 +654,9 @@ async def generate_qr(
         
         new_img.save(filepath)
 
+        # Логируем создание QR-кода
+        await log_action(user[0], "qr_create", f"Создан QR-код: {title}")
+        
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     
     except Exception as e:
@@ -691,6 +812,9 @@ async def update_qr(
         
         new_img.save(filepath)
 
+        # Логируем обновление QR-кода
+        await log_action(user[0], "qr_update", f"Обновлен QR-код: {title}")
+        
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     
     except Exception as e:
@@ -727,7 +851,7 @@ async def delete_qr(request: Request, qr_id: int):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             # Проверяем владельца QR-кода
-            cursor = await db.execute("SELECT user_id FROM qr_codes WHERE id = ?", (qr_id,))
+            cursor = await db.execute("SELECT user_id, title FROM qr_codes WHERE id = ?", (qr_id,))
             qr_owner = await cursor.fetchone()
             
             if qr_owner and (user[3] == "admin" or qr_owner[0] == user[0]):
@@ -740,6 +864,9 @@ async def delete_qr(request: Request, qr_id: int):
                         os.remove(path)
                     await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
                     await db.commit()
+                    
+                    # Логируем удаление QR-кода
+                    await log_action(user[0], "qr_delete", f"Удален QR-код: {qr_owner[1]}")
         
         return RedirectResponse(url="/dashboard/qr", status_code=303)
     except Exception as e:
@@ -798,6 +925,10 @@ async def add_user(
                 (username, password_hash, role, datetime.now().isoformat())
             )
             await db.commit()
+            
+            # Логируем добавление пользователя
+            await log_action(user[0], "user_add", f"Добавлен пользователь: {username} с ролью {role}")
+            
     except Exception as e:
         logger.error(f"Ошибка при добавлении пользователя: {e}")
     
@@ -817,15 +948,19 @@ async def change_user_role(
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             # Нельзя менять роль администратора
-            cursor = await db.execute("SELECT role FROM users WHERE id = ?", (user_id,))
-            current_role = await cursor.fetchone()
+            cursor = await db.execute("SELECT role, username FROM users WHERE id = ?", (user_id,))
+            current_user = await cursor.fetchone()
             
-            if current_role and current_role[0] != "admin":
+            if current_user and current_user[0] != "admin":
                 await db.execute(
                     "UPDATE users SET role = ? WHERE id = ?",
                     (new_role, user_id)
                 )
                 await db.commit()
+                
+                # Логируем изменение роли
+                await log_action(user[0], "user_role_change", f"Изменена роль пользователя {current_user[1]} на {new_role}")
+                
     except Exception as e:
         logger.error(f"Ошибка при изменении роли пользователя: {e}")
     
@@ -846,12 +981,17 @@ async def block_user(
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+            target_user = await cursor.fetchone()
+            
             if block_type == "permanent":
                 # Перманентная блокировка
                 await db.execute(
                     "UPDATE users SET is_blocked = 1, frozen_until = NULL, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
                     (user_id,)
                 )
+                # Логируем блокировку
+                await log_action(user[0], "user_block", f"Заблокирован пользователь: {target_user[0]}")
             else:
                 # Временная блокировка (заморозка)
                 duration = int(block_duration)
@@ -866,6 +1006,8 @@ async def block_user(
                     "UPDATE users SET is_blocked = 0, frozen_until = ?, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
                     (freeze_until.isoformat(), user_id)
                 )
+                # Логируем заморозку
+                await log_action(user[0], "user_freeze", f"Заморожен пользователь: {target_user[0]} до {freeze_until.strftime('%d.%m.%Y %H:%M')}")
             
             await db.commit()
     except Exception as e:
@@ -882,11 +1024,18 @@ async def unblock_user(request: Request, user_id: int):
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+            target_user = await cursor.fetchone()
+            
             await db.execute(
                 "UPDATE users SET is_blocked = 0, frozen_until = NULL WHERE id = ?",
                 (user_id,)
             )
             await db.commit()
+            
+            # Логируем разблокировку
+            await log_action(user[0], "user_unblock", f"Разблокирован пользователь: {target_user[0]}")
+            
     except Exception as e:
         logger.error(f"Ошибка при разблокировке пользователя: {e}")
     
@@ -902,12 +1051,16 @@ async def delete_user(request: Request, user_id: int):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             # Нельзя удалить администратора
-            cursor = await db.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+            cursor = await db.execute("SELECT role, username FROM users WHERE id = ?", (user_id,))
             user_role = await cursor.fetchone()
             
             if user_role and user_role[0] != "admin":
                 await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
                 await db.commit()
+                
+                # Логируем удаление пользователя
+                await log_action(user[0], "user_delete", f"Удален пользователь: {user_role[1]}")
+                
     except Exception as e:
         logger.error(f"Ошибка при удалении пользователя: {e}")
     
@@ -937,6 +1090,8 @@ async def block_ip(
                     "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, NULL, ?)",
                     (ip_address, reason, datetime.now().isoformat())
                 )
+                # Логируем блокировку IP
+                await log_action(user[0], "ip_block", f"Заблокирован IP: {ip_address} (постоянно)")
             else:
                 duration = int(block_duration)
                 if block_unit == "hours":
@@ -950,6 +1105,8 @@ async def block_ip(
                     "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, ?, ?)",
                     (ip_address, reason, blocked_until.isoformat(), datetime.now().isoformat())
                 )
+                # Логируем блокировку IP
+                await log_action(user[0], "ip_block", f"Заблокирован IP: {ip_address} до {blocked_until.strftime('%d.%m.%Y %H:%M')}")
             
             await db.commit()
     except ValueError:
@@ -970,6 +1127,10 @@ async def unblock_ip(request: Request, ip_address: str):
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("DELETE FROM blocked_ips WHERE ip_address = ?", (ip_address,))
             await db.commit()
+            
+            # Логируем разблокировку IP
+            await log_action(user[0], "ip_unblock", f"Разблокирован IP: {ip_address}")
+            
     except Exception as e:
         logger.error(f"Ошибка при разблокировке IP: {e}")
     
@@ -1001,6 +1162,169 @@ async def ip_management(request: Request):
             "ip_list": [],
             "user": user,
             "error": "Ошибка при загрузке данных"
+        })
+
+# --- СИСТЕМНЫЕ НАСТРОЙКИ (админ) ---
+@app.get("/dashboard/system", response_class=HTMLResponse)
+async def system_settings(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("SELECT * FROM system_settings ORDER BY setting_key")
+            settings_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("system_settings.html", {
+            "request": request,
+            "active": "system",
+            "settings_list": settings_list,
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке системных настроек: {e}")
+        return templates.TemplateResponse("system_settings.html", {
+            "request": request,
+            "active": "system",
+            "settings_list": [],
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- ОБНОВЛЕНИЕ СИСТЕМНЫХ НАСТРОЕК ---
+@app.post("/dashboard/system/update")
+async def update_system_settings(
+    request: Request,
+    setting_key: str = Form(...),
+    setting_value: str = Form(...)
+):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE system_settings SET setting_value = ?, updated_at = ? WHERE setting_key = ?",
+                (setting_value, datetime.now().isoformat(), setting_key)
+            )
+            await db.commit()
+            
+            # Логируем изменение настроек
+            await log_action(user[0], "system_settings_update", f"Обновлена настройка: {setting_key} = {setting_value}")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении системных настроек: {e}")
+    
+    return RedirectResponse(url="/dashboard/system", status_code=303)
+
+# --- ЛОГИ СИСТЕМЫ (админ) ---
+@app.get("/dashboard/logs", response_class=HTMLResponse)
+async def system_logs(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT al.*, u.username 
+                FROM action_logs al 
+                LEFT JOIN users u ON al.user_id = u.id 
+                ORDER BY al.created_at DESC 
+                LIMIT 100
+            """)
+            logs_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("system_logs.html", {
+            "request": request,
+            "active": "logs",
+            "logs_list": logs_list,
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке логов: {e}")
+        return templates.TemplateResponse("system_logs.html", {
+            "request": request,
+            "active": "logs",
+            "logs_list": [],
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- СТАТИСТИКА СИСТЕМЫ (админ) ---
+@app.get("/dashboard/stats", response_class=HTMLResponse)
+async def stats(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            # Общая статистика
+            cursor = await db.execute("SELECT COUNT(*) FROM users")
+            total_users = await cursor.fetchone()
+            
+            cursor = await db.execute("SELECT COUNT(*) FROM qr_codes")
+            total_qr = await cursor.fetchone()
+            
+            cursor = await db.execute("SELECT SUM(scan_count) FROM qr_codes")
+            total_scans = await cursor.fetchone()
+            
+            cursor = await db.execute("SELECT COUNT(*) FROM blocked_ips")
+            total_blocked_ips = await cursor.fetchone()
+            
+            # Статистика по ролям
+            cursor = await db.execute("SELECT role, COUNT(*) FROM users GROUP BY role")
+            roles_stats = await cursor.fetchall()
+            
+            # Последние QR-коды
+            cursor = await db.execute("""
+                SELECT qr.id, qr.title, qr.scan_count, qr.created_at, u.username 
+                FROM qr_codes qr 
+                LEFT JOIN users u ON qr.user_id = u.id 
+                ORDER BY qr.created_at DESC 
+                LIMIT 10
+            """)
+            recent_qr = await cursor.fetchall()
+            
+            # Статистика по сканированиям
+            cursor = await db.execute("""
+                SELECT DATE(created_at) as date, COUNT(*) as count 
+                FROM qr_codes 
+                WHERE created_at >= date('now', '-30 days') 
+                GROUP BY DATE(created_at) 
+                ORDER BY date DESC
+            """)
+            scans_stats = await cursor.fetchall()
+        
+        return templates.TemplateResponse("stats.html", {
+            "request": request,
+            "active": "stats",
+            "total_users": total_users[0],
+            "total_qr": total_qr[0],
+            "total_scans": total_scans[0] or 0,
+            "total_blocked_ips": total_blocked_ips[0],
+            "roles_stats": roles_stats,
+            "recent_qr": recent_qr,
+            "scans_stats": scans_stats,
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке статистики: {e}")
+        return templates.TemplateResponse("stats.html", {
+            "request": request,
+            "active": "stats",
+            "total_users": 0,
+            "total_qr": 0,
+            "total_scans": 0,
+            "total_blocked_ips": 0,
+            "roles_stats": [],
+            "recent_qr": [],
+            "scans_stats": [],
+            "user": user,
+            "error": "Ошибка при загрузке статистики"
         })
 
 # --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ ---
@@ -1047,6 +1371,9 @@ async def change_theme(request: Request, theme: str = Form(...)):
         # Обновляем данные пользователя в сессии
         request.session["user_theme"] = theme
         
+        # Логируем смену темы
+        await log_action(user[0], "theme_change", f"Смена темы на: {theme}")
+        
     except Exception as e:
         logger.error(f"Ошибка при смене темы: {e}")
     
@@ -1082,6 +1409,9 @@ async def upload_logo(request: Request, logo: UploadFile = File(...)):
                 (logo_url, user[0])
             )
             await db.commit()
+        
+        # Логируем загрузку логотипа
+        await log_action(user[0], "logo_upload", "Загружен новый логотип")
         
     except Exception as e:
         logger.error(f"Ошибка при загрузке логотипа: {e}")
@@ -1163,36 +1493,6 @@ async def modules(request: Request):
         "active": "modules",
         "user": user
     })
-
-@app.get("/dashboard/stats", response_class=HTMLResponse)
-async def stats(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("""
-                SELECT id, title, data, filename, scan_count, last_scan
-                FROM qr_codes
-                ORDER BY id DESC
-            """)
-            stats_list = await cursor.fetchall()
-        return templates.TemplateResponse("stats.html", {
-            "request": request,
-            "active": "stats",
-            "stats_list": stats_list,
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке статистики: {e}")
-        return templates.TemplateResponse("stats.html", {
-            "request": request,
-            "active": "stats",
-            "stats_list": [],
-            "user": user,
-            "error": "Ошибка при загрузке статистики"
-        })
 
 @app.get("/dashboard/settings", response_class=HTMLResponse)
 async def settings(request: Request):
