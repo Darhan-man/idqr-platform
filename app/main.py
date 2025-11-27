@@ -123,6 +123,22 @@ async def startup():
                 )
             """)
             
+            # Таблица жалоб
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS complaints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    user_name TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'new',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT,
+                    admin_response TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+            
             # Создаем администратора по умолчанию
             admin_password = "admin123"
             await db.execute("""
@@ -1327,6 +1343,163 @@ async def stats(request: Request):
             "error": "Ошибка при загрузке статистики"
         })
 
+# --- ЖАЛОБЫ: ФОРМА ОТПРАВКИ ---
+@app.get("/user/energy/complaints/new", response_class=HTMLResponse)
+async def new_complaint_page(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("complaint_form.html", {
+        "request": request,
+        "user": user
+    })
+
+@app.post("/user/energy/complaints/new")
+async def submit_complaint(
+    request: Request,
+    subject: str = Form(...),
+    message: str = Form(...)
+):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO complaints (user_id, user_name, subject, message, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user[0], user[1], subject, message, datetime.now().isoformat())
+            )
+            await db.commit()
+            
+            # Логируем отправку жалобы
+            await log_action(user[0], "complaint_submitted", f"Подана жалоба: {subject}")
+            
+        return templates.TemplateResponse("complaint_success.html", {
+            "request": request,
+            "user": user,
+            "message": "Ваша жалоба успешно отправлена администратору"
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка при отправке жалобы: {e}")
+        return templates.TemplateResponse("complaint_form.html", {
+            "request": request,
+            "user": user,
+            "error": "Ошибка при отправке жалобы"
+        })
+
+# --- ЖАЛОБЫ: ПРОСМОТР СТАТУСА ---
+@app.get("/user/energy/complaints/status", response_class=HTMLResponse)
+async def complaint_status(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(
+                "SELECT * FROM complaints WHERE user_id = ? ORDER BY created_at DESC",
+                (user[0],)
+            )
+            complaints = await cursor.fetchall()
+        
+        return templates.TemplateResponse("complaint_status.html", {
+            "request": request,
+            "user": user,
+            "complaints": complaints
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке жалоб: {e}")
+        return templates.TemplateResponse("complaint_status.html", {
+            "request": request,
+            "user": user,
+            "complaints": [],
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- ЖАЛОБЫ: АДМИН ПАНЕЛЬ ---
+@app.get("/dashboard/energy/complaints/admin", response_class=HTMLResponse)
+async def admin_complaints(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT c.*, u.username 
+                FROM complaints c 
+                LEFT JOIN users u ON c.user_id = u.id 
+                ORDER BY c.status ASC, c.created_at DESC
+            """)
+            complaints = await cursor.fetchall()
+        
+        return templates.TemplateResponse("admin_complaints.html", {
+            "request": request,
+            "user": user,
+            "complaints": complaints,
+            "active": "complaints"
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке жалоб: {e}")
+        return templates.TemplateResponse("admin_complaints.html", {
+            "request": request,
+            "user": user,
+            "complaints": [],
+            "error": "Ошибка при загрузке данных",
+            "active": "complaints"
+        })
+
+# --- ЖАЛОБЫ: ОБНОВЛЕНИЕ СТАТУСА АДМИНОМ ---
+@app.post("/dashboard/energy/complaints/{complaint_id}/update")
+async def update_complaint_status(
+    request: Request,
+    complaint_id: int,
+    status: str = Form(...),
+    admin_response: str = Form(None)
+):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE complaints SET status = ?, admin_response = ?, updated_at = ? WHERE id = ?",
+                (status, admin_response, datetime.now().isoformat(), complaint_id)
+            )
+            await db.commit()
+            
+            # Логируем обновление жалобы
+            await log_action(user[0], "complaint_updated", f"Обновлена жалоба #{complaint_id}, статус: {status}")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении жалобы: {e}")
+    
+    return RedirectResponse(url="/dashboard/energy/complaints/admin", status_code=303)
+
+# --- ЖАЛОБЫ: УДАЛЕНИЕ АДМИНОМ ---
+@app.get("/dashboard/energy/complaints/{complaint_id}/delete")
+async def delete_complaint(request: Request, complaint_id: int):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
+            await db.commit()
+            
+            # Логируем удаление жалобы
+            await log_action(user[0], "complaint_deleted", f"Удалена жалоба #{complaint_id}")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при удалении жалобы: {e}")
+    
+    return RedirectResponse(url="/dashboard/energy/complaints/admin", status_code=303)
+
 # --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ ---
 @app.get("/user/dashboard", response_class=HTMLResponse)
 async def user_dashboard(request: Request):
@@ -1517,6 +1690,139 @@ async def admin_cleaning(request: Request):
         "request": request,
         "user": user,
         "active": "cleaning"
+    })
+
+# --- МОДУЛЬ ЭНЕРГЕТИКИ И ИНФРАСТРУКТУРЫ ---
+@app.get("/dashboard/energy", response_class=HTMLResponse)
+async def admin_energy(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/electricity", response_class=HTMLResponse)
+async def admin_energy_electricity(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_electricity.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/meters", response_class=HTMLResponse)
+async def admin_energy_meters(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_meters.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/inspections", response_class=HTMLResponse)
+async def admin_energy_inspections(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_inspections.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/heat_gas", response_class=HTMLResponse)
+async def admin_energy_heat_gas(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_heat_gas.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/renewable", response_class=HTMLResponse)
+async def admin_energy_renewable(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_renewable.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/suppliers", response_class=HTMLResponse)
+async def admin_energy_suppliers(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_suppliers.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/consumers", response_class=HTMLResponse)
+async def admin_energy_consumers(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_consumers.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/complaints", response_class=HTMLResponse)
+async def admin_energy_complaints(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_complaints.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/analytics", response_class=HTMLResponse)
+async def admin_energy_analytics(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_analytics.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/documents", response_class=HTMLResponse)
+async def admin_energy_documents(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_documents.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
     })
 
 # --- ОСТАЛЬНЫЕ МАРШРУТЫ ДЛЯ АДМИНА ---
