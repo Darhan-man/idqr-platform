@@ -156,121 +156,6 @@
       font-weight: 600;
     }
 
-    .complaint-form {
-      background: var(--card-bg);
-      padding: 2rem;
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow);
-      margin-bottom: 2rem;
-    }
-
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: 1px solid var(--card-border);
-      border-radius: var(--border-radius-sm);
-      background: var(--input-bg);
-      color: var(--text-primary);
-      font-size: 1rem;
-      transition: var(--transition);
-    }
-
-    .form-group input:focus,
-    .form-group textarea:focus,
-    .form-group select:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
-    }
-
-    .form-group textarea {
-      min-height: 120px;
-      resize: vertical;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: var(--border-radius-sm);
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: var(--primary-dark);
-      transform: translateY(-2px);
-    }
-
-    .btn-secondary {
-      background: var(--secondary);
-      color: white;
-    }
-
-    .btn-danger {
-      background: var(--error);
-      color: white;
-    }
-
-    .complaints-table {
-      width: 100%;
-      background: var(--card-bg);
-      border-radius: var(--border-radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      margin-bottom: 2rem;
-    }
-
-    .complaints-table th,
-    .complaints-table td {
-      padding: 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--card-border);
-    }
-
-    .complaints-table th {
-      background: var(--primary);
-      color: white;
-      font-weight: 600;
-    }
-
-    .status-new { color: var(--warning); font-weight: 600; }
-    .status-in_progress { color: var(--primary); font-weight: 600; }
-    .status-resolved { color: var(--success); font-weight: 600; }
-    .status-rejected { color: var(--error); font-weight: 600; }
-
-    .admin-actions {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .response-form {
-      margin-top: 1rem;
-    }
-
     .particles {
       position: fixed;
       top: 0;
@@ -306,14 +191,6 @@
       h2 {
         font-size: 1.8rem;
       }
-      
-      .complaints-table {
-        font-size: 0.9rem;
-      }
-      
-      .admin-actions {
-        flex-direction: column;
-      }
     }
 
     @media (max-width: 480px) {
@@ -338,7 +215,6 @@
   <div class="container">
     <h2><i class="fas fa-exclamation-triangle"></i> Жалобы и обращения</h2>
 
-    {% if user and user[3] == 'admin' %}
     <div class="category-section">
       <h3 class="category-title"><i class="fas fa-cog"></i> Управление жалобами</h3>
       <div class="modules-grid">
@@ -347,7 +223,7 @@
         </a>
       </div>
     </div>
-    {% else %}
+
     <div class="category-section">
       <h3 class="category-title"><i class="fas fa-comments"></i> Мои жалобы</h3>
       <div class="modules-grid">
@@ -359,7 +235,6 @@
         </a>
       </div>
     </div>
-    {% endif %}
   </div>
 
   <script>
