@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDQR: Подача жалобы</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Стили такие же как в energy_complaints.html */
+    :root {
+      --primary: #6C63FF;
+      --primary-dark: #564FD8;
+      --secondary: #FF64B4;
+      --accent: #6DDFFF;
+      --light: #F8FAFF;
+      --dark: #1E1E2E;
+      --gray: #8B8B9F;
+      --success: #00C9A7;
+      --error: #FF6B93;
+      --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --card-border: rgba(255, 255, 255, 0.2);
+      --text-primary: #1E1E2E;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(255, 255, 255, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.2);
+      --input-bg: rgba(255, 255, 255, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+      --border-radius: 16px;
+      --border-radius-sm: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    [data-theme="dark"] {
+      --primary: #817BFF;
+      --primary-dark: #6C63FF;
+      --secondary: #FF7AC6;
+      --accent: #81E6FF;
+      --light: #252536;
+      --dark: #F0F0F0;
+      --gray: #7B7B8F;
+      --success: #00D6B3;
+      --error: #FF7A9E;
+      --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+      --card-bg: rgba(30, 30, 46, 0.9);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-primary: #F0F0F0;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(30, 30, 46, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.1);
+      --input-bg: rgba(30, 30, 46, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    h2 {
+      text-align: center;
+      margin: 2.5rem 0;
+      color: var(--text-primary);
+      font-size: 2.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      font-weight: 700;
+    }
+
+    .complaint-form {
+      background: var(--card-bg);
+      padding: 2rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--card-border);
+      border-radius: var(--border-radius-sm);
+      background: var(--input-bg);
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: var(--transition);
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+    }
+
+    .form-group textarea {
+      min-height: 200px;
+      resize: vertical;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: var(--border-radius-sm);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--gray);
+      color: white;
+      text-decoration: none;
+    }
+
+    .error-message {
+      background: var(--error);
+      color: white;
+      padding: 1rem;
+      border-radius: var(--border-radius-sm);
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      opacity: 0.1;
+      animation: float 15s infinite linear;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0) rotate(0deg);
+      }
+      100% {
+        transform: translateY(-100vh) rotate(360deg);
+      }
+    }
+
+    @media (max-width: 768px) {
+      h2 {
+        font-size: 1.8rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h2 {
+        font-size: 1.6rem;
+      }
+      
+      .container {
+        padding: 0 1rem;
+      }
+      
+      .complaint-form {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+
+  <div class="container">
+    <h2><i class="fas fa-edit"></i> Подача жалобы</h2>
+
+    {% if error %}
+    <div class="error-message">
+      <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="complaint-form">
+      <form method="post" action="/user/energy/complaints/new">
+        <div class="form-group">
+          <label for="subject">Тема жалобы *</label>
+          <input type="text" id="subject" name="subject" required placeholder="Кратко опишите суть проблемы">
+        </div>
+
+        <div class="form-group">
+          <label for="message">Подробное описание *</label>
+          <textarea id="message" name="message" required placeholder="Опишите проблему подробно, укажите все необходимые детали..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <a href="/user/energy/complaints" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Назад
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane"></i> Отправить жалобу
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 15;
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        const size = Math.random() * 50 + 10;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        particle.style.left = `${Math.random() * 100}vw`;
+        particle.style.top = `${Math.random() * 100}vh`;
+        
+        particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+        particle.style.animationDelay = `-${Math.random() * 20}s`;
+        
+        particlesContainer.appendChild(particle);
+      }
+    });
+  </script>
+</body>
+</html>

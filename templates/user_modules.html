@@ -233,6 +233,96 @@
             line-height: 1.6;
         }
 
+        .theme-container {
+            display: flex;
+            justify-content: flex-end;
+            padding: 1rem 2rem;
+        }
+
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--card-bg);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--card-border);
+        }
+
+        .theme-switch {
+            display: inline-block;
+            position: relative;
+            width: 60px;
+            height: 34px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider i {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: white;
+        }
+
+        .slider .sun {
+            left: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slider .moon {
+            right: 8px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        input:checked + .slider .sun {
+            opacity: 1;
+        }
+
+        input:checked + .slider .moon {
+            opacity: 0;
+        }
+
         .particles {
             position: fixed;
             top: 0;
@@ -274,6 +364,25 @@
             h2 {
                 font-size: 1.6rem;
             }
+            
+            .theme-container {
+                padding: 1rem;
+                justify-content: center;
+            }
+            
+            .theme-switch {
+                width: 50px;
+                height: 28px;
+            }
+            
+            .slider:before {
+                height: 20px;
+                width: 20px;
+            }
+            
+            input:checked + .slider:before {
+                transform: translateX(22px);
+            }
         }
 
         @media (max-width: 480px) {
@@ -298,6 +407,19 @@
 </head>
 <body data-theme="{{ user[10] if user else 'light' }}">
     <div class="particles" id="particles"></div>
+    
+    <div class="theme-container">
+        <div class="theme-switch-wrapper">
+            <span>Тёмная тема</span>
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" />
+                <div class="slider">
+                    <i class="fas fa-sun sun"></i>
+                    <i class="fas fa-moon moon"></i>
+                </div>
+            </label>
+        </div>
+    </div>
     
     <div class="navbar">
         <h1><i class="fas fa-puzzle-piece"></i> IDQR: Модули</h1>
@@ -331,6 +453,13 @@
             <h3 class="category-title"><i class="fas fa-building"></i> Бизнес и коммерция</h3>
             <div class="modules-grid">
                 <a href="/user/business" class="module-button"><i class="fas fa-store"></i> Бизнес и магазины</a>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <h3 class="category-title"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</h3>
+            <div class="modules-grid">
+                <a href="/user/energy" class="module-button"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</a>
             </div>
         </div>
 
@@ -457,11 +586,26 @@
                 particlesContainer.appendChild(particle);
             }
 
-            // Применяем тему из localStorage при загрузке
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme) {
-                document.documentElement.setAttribute('data-theme', savedTheme);
+            // Обработка переключения темы
+            const toggleSwitch = document.querySelector('#checkbox');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggleSwitch.checked = true;
             }
+            
+            function switchTheme(e) {
+                if (e.target.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }    
+            }
+            
+            toggleSwitch.addEventListener('change', switchTheme, false);
         });
     </script>
 </body>

@@ -472,6 +472,8 @@
             <a href="/dashboard/modules"><i class="fas fa-puzzle-piece"></i> Модули</a>
             <a href="/dashboard/users"><i class="fas fa-user"></i> Пользователи</a>
             <a href="/dashboard/ip"><i class="fas fa-network-wired"></i> IP-Блокировки</a>
+            <a href="/dashboard/energy/complaints/admin" {% if active == 'complaints' %}class="active"{% endif %}>
+            <i class="fas fa-exclamation-triangle"></i> Жалобы</a>
             <a href="/dashboard/stats"><i class="fas fa-chart-bar"></i> Статистика</a>
             <a href="/dashboard/settings"><i class="fas fa-cog"></i> Настройки</a>
             {% else %}
