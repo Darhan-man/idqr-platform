@@ -16,6 +16,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import uuid
+import traceback
+from urllib.parse import urlparse, urljoin
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -644,12 +646,12 @@ def get_user_modules(user_id):
         else:
             # Обычные пользователи получают модули на основе разрешений
             modules = conn.execute('''
-                SELECT DISTINCT m.*, COALESCE(uma.access_level, mp.access_level) as access_level
+                SELECT DISTINCT m.*, COALESCE(uma.access_level, 'view') as access_level
                 FROM modules m
                 LEFT JOIN module_permissions mp ON m.id = mp.module_id AND mp.role = ?
                 LEFT JOIN user_module_access uma ON m.id = uma.module_id AND uma.user_id = ?
                 WHERE m.enabled = 1 
-                AND (mp.can_view = 1 OR uma.access_level IS NOT NULL)
+                AND (mp.can_view = 1 OR uma.access_level IS NOT NULL OR m.code IN ('medicine', 'energy', 'business'))
                 ORDER BY m.name
             ''', (user['role'], user_id)).fetchall()
         
@@ -705,6 +707,10 @@ def check_module_access(user_id, module_code, required_access='view'):
             
             if user_access_index >= required_access_index:
                 return True
+        
+        # Для основных модулей разрешаем доступ по умолчанию
+        if module_code in ['medicine', 'energy', 'business']:
+            return True
         
         return False
     except Exception as e:
@@ -1516,11 +1522,22 @@ def medicine_page():
     else:
         theme = get_system_setting('default_theme', 'light')
     
+    # Получаем информацию о модуле медицины
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('medicine',)).fetchone()
+        module = dict(module) if module else None
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле медицины: {e}")
+        module = None
+    finally:
+        conn.close()
+    
     # Логируем просмотр
     if 'user_id' in session:
         log_activity(session['user_id'], 'view_medicine', 'medicine', 'Просмотр страницы медицины')
     
-    return render_template('medicine.html', theme=theme)
+    return render_template('medicine.html', theme=theme, module=module)
 
 @app.route('/user/medicine')
 @login_required
@@ -1534,12 +1551,61 @@ def user_medicine():
         flash('Пользователь не найден', 'error')
         return redirect(url_for('login'))
     
+    # Получаем информацию о модуле медицины
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('medicine',)).fetchone()
+        module = dict(module) if module else None
+        
+        # Получаем статистику для модуля медицины
+        stats = {
+            'total_activities': conn.execute('SELECT COUNT(*) as count FROM user_activity WHERE user_id = ? AND module = ?', 
+                                           (user['id'], 'medicine')).fetchone()['count'],
+            'last_access': conn.execute('SELECT MAX(created_at) as last_access FROM user_activity WHERE user_id = ? AND module = ?', 
+                                      (user['id'], 'medicine')).fetchone()['last_access']
+        }
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле медицины: {e}")
+        module = None
+        stats = {}
+    finally:
+        conn.close()
+    
     # Логируем доступ к модулю
     log_activity(user['id'], 'access_module', 'medicine', 'Доступ к модулю медицины')
     
-    return render_template('user_medicine.html', user=user)
+    return render_template('user_medicine.html', user=user, module=module, stats=stats)
 
 # ==================== ЭНЕРГЕТИКА ====================
+
+@app.route('/energy')
+def energy_page():
+    """Общая страница энергетики"""
+    # Получаем тему из сессии или настройки системы
+    theme = 'light'
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        if user:
+            theme = user['theme']
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    # Получаем информацию о модуле энергетики
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('energy',)).fetchone()
+        module = dict(module) if module else None
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле энергетики: {e}")
+        module = None
+    finally:
+        conn.close()
+    
+    # Логируем просмотр
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_energy', 'energy', 'Просмотр страницы энергетики')
+    
+    return render_template('energy.html', theme=theme, module=module)
 
 @app.route('/user/energy')
 @login_required
@@ -1553,10 +1619,30 @@ def user_energy():
         flash('Пользователь не найден', 'error')
         return redirect(url_for('login'))
     
+    # Получаем информацию о модуле энергетики
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('energy',)).fetchone()
+        module = dict(module) if module else None
+        
+        # Получаем статистику для модуля энергетики
+        stats = {
+            'total_activities': conn.execute('SELECT COUNT(*) as count FROM user_activity WHERE user_id = ? AND module = ?', 
+                                           (user['id'], 'energy')).fetchone()['count'],
+            'last_access': conn.execute('SELECT MAX(created_at) as last_access FROM user_activity WHERE user_id = ? AND module = ?', 
+                                      (user['id'], 'energy')).fetchone()['last_access']
+        }
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле энергетики: {e}")
+        module = None
+        stats = {}
+    finally:
+        conn.close()
+    
     # Логируем доступ к модулю
     log_activity(user['id'], 'access_module', 'energy', 'Доступ к модулю энергетики')
     
-    return render_template('user_energy.html', user=user)
+    return render_template('user_energy.html', user=user, module=module, stats=stats)
 
 @app.route('/energy/complaints')
 @login_required
@@ -1570,10 +1656,52 @@ def energy_complaints():
         flash('Пользователь не найден', 'error')
         return redirect(url_for('login'))
     
+    # Получаем информацию о модуле энергетики
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('energy',)).fetchone()
+        module = dict(module) if module else None
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле энергетики: {e}")
+        module = None
+    finally:
+        conn.close()
+    
     # Логируем доступ к модулю
     log_activity(user['id'], 'access_module', 'energy', 'Доступ к жалобам и обращениям в энергетике')
     
-    return render_template('energy_complaints.html', user=user)
+    return render_template('energy_complaints.html', user=user, module=module)
+
+# ==================== БИЗНЕС ====================
+
+@app.route('/business')
+def business_page():
+    """Общая страница бизнеса"""
+    # Получаем тему из сессии или настройки системы
+    theme = 'light'
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        if user:
+            theme = user['theme']
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    # Получаем информацию о модуле бизнеса
+    conn = get_db_connection()
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE code = ?', ('business',)).fetchone()
+        module = dict(module) if module else None
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле бизнеса: {e}")
+        module = None
+    finally:
+        conn.close()
+    
+    # Логируем просмотр
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_business', 'business', 'Просмотр страницы бизнеса')
+    
+    return render_template('business.html', theme=theme, module=module)
 
 # ==================== АДМИНИСТРАТИВНЫЕ МАРШРУТЫ ====================
 
@@ -2391,7 +2519,8 @@ def inject_settings():
     return {
         'site_name': get_system_setting('site_name', 'IDQR Система'),
         'site_description': get_system_setting('site_description', 'Комплексная система управления'),
-        'registration_enabled': get_system_setting('registration_enabled', 'true') == 'true'
+        'registration_enabled': get_system_setting('registration_enabled', 'true') == 'true',
+        'default_theme': get_system_setting('default_theme', 'light')
     }
 
 @app.before_request
@@ -2436,7 +2565,7 @@ def internal_server_error(e):
     """Обработка ошибки 500"""
     # Логируем ошибку
     user_id = session.get('user_id')
-    log_error(user_id, 'internal_server_error', str(e), str(traceback.format_exc()))
+    log_error(user_id, 'internal_server_error', str(e), traceback.format_exc())
     
     if request.path.startswith('/api/'):
         return jsonify({'success': False, 'error': 'Внутренняя ошибка сервера'}), 500
@@ -2475,10 +2604,12 @@ if __name__ == '__main__':
     print(f"📁 Загрузки: {app.config['UPLOAD_FOLDER']}")
     print("="*60)
     print("📋 Доступные модули:")
-    print("  • /user/energy - Энергетика и инфраструктура")
-    print("  • /user/medicine - Медицина и здоровье")
-    print("  • /medicine - Общая страница медицины")
+    print("  • /energy - Энергетика и инфраструктура")
+    print("  • /user/energy - Модуль энергетики (требует авторизации)")
     print("  • /energy/complaints - Жалобы и обращения")
+    print("  • /medicine - Медицина и здоровье")
+    print("  • /user/medicine - Модуль медицины (требует авторизации)")
+    print("  • /business - Бизнес и магазины")
     print("  • /modules - Все модули системы")
     print("  • /user/modules - Модули пользователя")
     print("="*60)
