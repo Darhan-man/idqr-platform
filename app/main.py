@@ -1,1866 +1,2489 @@
-from fastapi import FastAPI, Form, Request, HTTPException, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.middleware import Middleware
-from starlette.middleware.sessions import SessionMiddleware
-import qrcode
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, Response
+import sqlite3
+import hashlib
 import os
-import uuid
-from datetime import datetime, timedelta
-import aiosqlite
-from PIL import Image, ImageDraw, ImageFont, ImageColor
-import logging
-import textwrap
 import json
+from datetime import datetime, timedelta
 import secrets
-from passlib.context import CryptContext
-import ipaddress
-from typing import Optional
+from functools import wraps
+import csv
+import io
+from werkzeug.utils import secure_filename
+import qrcode
+from io import BytesIO
+import base64
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+import uuid
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = Flask(__name__)
+app.secret_key = secrets.token_hex(32)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+app.config['DATABASE'] = 'idqr_system.db'
 
-# Секретный ключ для сессий (в продакшене должен быть в переменных окружения)
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-change-in-production")
+# Создаем необходимые папки
+for folder in ['uploads', 'templates', 'static', 'static/images', 'static/css', 'static/js']:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-# Создаем middleware для сессий
-middleware = [
-    Middleware(SessionMiddleware, secret_key=SECRET_KEY)
-]
+# ==================== УТИЛИТЫ БАЗЫ ДАННЫХ ====================
 
-app = FastAPI(middleware=middleware)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+def get_db_connection():
+    """Создание соединения с базой данных"""
+    conn = sqlite3.connect(app.config['DATABASE'])
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# --- Константы ---
-QR_FOLDER = "static/qr"
-LOGOS_FOLDER = "static/logos"
-DB_PATH = "qr_data.db"
-ADMIN_CODE = "admin1990"
-BASE_URL = "https://idqr-platform.onrender.com"
-
-# Настройка безопасности - используем argon2 вместо bcrypt чтобы избежать ограничения длины
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-
-# Создаем папки если они не существуют
-os.makedirs(QR_FOLDER, exist_ok=True)
-os.makedirs(LOGOS_FOLDER, exist_ok=True)
-os.makedirs("static/fonts", exist_ok=True)
-
-# --- ИНИЦИАЛИЗАЦИЯ БД ---
-@app.on_event("startup")
-async def startup():
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # Таблица QR-кодов
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS qr_codes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    data TEXT NOT NULL,
-                    filename TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    scan_count INTEGER DEFAULT 0,
-                    last_scan TEXT,
-                    colors TEXT DEFAULT '{"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000"}',
-                    user_id INTEGER
-                )
-            """)
-            
-            # Таблица пользователей с расширенными полями
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'user',
-                    is_active BOOLEAN NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL,
-                    last_login TEXT,
-                    is_blocked BOOLEAN NOT NULL DEFAULT 0,
-                    frozen_until TEXT,
-                    block_count INTEGER DEFAULT 0,
-                    theme TEXT NOT NULL DEFAULT 'light',
-                    logo_url TEXT,
-                    ip_address TEXT
-                )
-            """)
-            
-            # Таблица заблокированных IP
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS blocked_ips (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ip_address TEXT UNIQUE NOT NULL,
-                    reason TEXT,
-                    blocked_until TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            
-            # Таблица системных настроек
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS system_settings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    setting_key TEXT UNIQUE NOT NULL,
-                    setting_value TEXT NOT NULL,
-                    description TEXT,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            
-            # Таблица логов действий
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS action_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    action_type TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    ip_address TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            
-            # Таблица жалоб
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS complaints (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    user_name TEXT NOT NULL,
-                    subject TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'new',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT,
-                    admin_response TEXT,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                )
-            """)
-            
-            # Создаем администратора по умолчанию
-            admin_password = "admin123"
-            await db.execute("""
-                INSERT OR IGNORE INTO users (username, password_hash, role, created_at) 
-                VALUES (?, ?, ?, ?)
-            """, ("admin", pwd_context.hash(admin_password), "admin", datetime.now().isoformat()))
-            
-            # Создаем базовые системные настройки
-            await db.execute("""
-                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
-                VALUES (?, ?, ?, ?)
-            """, ("site_name", "IDQR Platform", "Название сайта", datetime.now().isoformat()))
-            
-            await db.execute("""
-                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
-                VALUES (?, ?, ?, ?)
-            """, ("max_qr_per_user", "50", "Максимум QR-кодов на пользователя", datetime.now().isoformat()))
-            
-            await db.execute("""
-                INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description, updated_at) 
-                VALUES (?, ?, ?, ?)
-            """, ("registration_enabled", "true", "Разрешена ли регистрация новых пользователей", datetime.now().isoformat()))
-            
-            await db.commit()
-            logger.info("База данных инициализирована")
-    except Exception as e:
-        logger.error(f"Ошибка при инициализации БД: {e}")
-
-# --- Функции аутентификации и утилиты ---
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    # Обрезаем пароль до 72 символов для совместимости
-    if len(password) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
-
-async def check_ip_blocked(ip_address: str) -> bool:
-    """Проверяет заблокирован ли IP"""
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                "SELECT blocked_until FROM blocked_ips WHERE ip_address = ?", 
-                (ip_address,)
-            )
-            result = await cursor.fetchone()
-            
-            if result:
-                blocked_until = result[0]
-                if blocked_until:
-                    # Временная блокировка
-                    if datetime.now() < datetime.fromisoformat(blocked_until):
-                        return True
-                    else:
-                        # Время блокировки истекло - удаляем запись
-                        await db.execute("DELETE FROM blocked_ips WHERE ip_address = ?", (ip_address,))
-                        await db.commit()
-                        return False
-                else:
-                    # Перманентная блокировка
-                    return True
-    except Exception as e:
-        logger.error(f"Ошибка при проверке IP: {e}")
+def init_db():
+    """Инициализация базы данных с созданием всех таблиц"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    return False
+    # Таблица пользователей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            full_name VARCHAR(100),
+            phone VARCHAR(20),
+            company VARCHAR(100),
+            position VARCHAR(100),
+            role VARCHAR(20) DEFAULT 'user',
+            status VARCHAR(20) DEFAULT 'active',
+            theme VARCHAR(10) DEFAULT 'light',
+            language VARCHAR(10) DEFAULT 'ru',
+            avatar TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            last_activity TIMESTAMP,
+            login_count INTEGER DEFAULT 0,
+            settings TEXT DEFAULT '{}',
+            api_key VARCHAR(64) UNIQUE,
+            two_factor_enabled BOOLEAN DEFAULT 0,
+            email_verified BOOLEAN DEFAULT 0,
+            phone_verified BOOLEAN DEFAULT 0,
+            verification_token VARCHAR(64),
+            reset_token VARCHAR(64),
+            reset_expires TIMESTAMP
+        )
+    ''')
+    
+    # Таблица сессий
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_id VARCHAR(64) UNIQUE NOT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            is_active BOOLEAN DEFAULT 1,
+            last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица активности
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action_type VARCHAR(50) NOT NULL,
+            module VARCHAR(50),
+            description TEXT,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица модулей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS modules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            code VARCHAR(50) UNIQUE NOT NULL,
+            description TEXT,
+            icon VARCHAR(50),
+            category VARCHAR(50),
+            version VARCHAR(20),
+            author VARCHAR(100),
+            enabled BOOLEAN DEFAULT 1,
+            settings TEXT DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Таблица разрешений модулей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS module_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            module_id INTEGER NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            can_view BOOLEAN DEFAULT 1,
+            can_edit BOOLEAN DEFAULT 0,
+            can_delete BOOLEAN DEFAULT 0,
+            can_manage BOOLEAN DEFAULT 0,
+            FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица доступа пользователей к модулям
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_module_access (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            module_id INTEGER NOT NULL,
+            access_level VARCHAR(20) DEFAULT 'view',
+            granted_by INTEGER,
+            granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
+            UNIQUE(user_id, module_id)
+        )
+    ''')
+    
+    # Таблица настроек системы
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            setting_key VARCHAR(100) UNIQUE NOT NULL,
+            setting_value TEXT,
+            setting_type VARCHAR(20) DEFAULT 'string',
+            category VARCHAR(50),
+            description TEXT,
+            is_public BOOLEAN DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Таблица уведомлений
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            message TEXT NOT NULL,
+            notification_type VARCHAR(50),
+            icon VARCHAR(50),
+            is_read BOOLEAN DEFAULT 0,
+            action_url TEXT,
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            read_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица документов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            filename VARCHAR(255),
+            file_path TEXT,
+            file_type VARCHAR(50),
+            file_size INTEGER,
+            mime_type VARCHAR(100),
+            category VARCHAR(50),
+            tags TEXT,
+            is_public BOOLEAN DEFAULT 0,
+            is_encrypted BOOLEAN DEFAULT 0,
+            version INTEGER DEFAULT 1,
+            parent_id INTEGER,
+            downloads INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица аудита
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action VARCHAR(100) NOT NULL,
+            entity_type VARCHAR(50),
+            entity_id INTEGER,
+            old_values TEXT,
+            new_values TEXT,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Таблица API ключей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            api_key VARCHAR(64) UNIQUE NOT NULL,
+            name VARCHAR(100),
+            permissions TEXT,
+            last_used TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            is_active BOOLEAN DEFAULT 1,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица категорий модулей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS module_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            code VARCHAR(50) UNIQUE NOT NULL,
+            description TEXT,
+            icon VARCHAR(50),
+            color VARCHAR(20),
+            sort_order INTEGER DEFAULT 0,
+            parent_id INTEGER,
+            is_active BOOLEAN DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (parent_id) REFERENCES module_categories(id) ON DELETE SET NULL
+        )
+    ''')
+    
+    # Таблица файлов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            original_filename VARCHAR(255) NOT NULL,
+            stored_filename VARCHAR(255) UNIQUE NOT NULL,
+            file_path TEXT NOT NULL,
+            file_type VARCHAR(50),
+            file_size INTEGER,
+            mime_type VARCHAR(100),
+            is_public BOOLEAN DEFAULT 0,
+            downloads INTEGER DEFAULT 0,
+            upload_ip VARCHAR(45),
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Таблица логов ошибок
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS error_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            error_type VARCHAR(100),
+            error_message TEXT,
+            stack_trace TEXT,
+            request_url TEXT,
+            request_method VARCHAR(10),
+            request_data TEXT,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Таблица статистики
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS statistics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE UNIQUE NOT NULL,
+            total_users INTEGER DEFAULT 0,
+            active_users INTEGER DEFAULT 0,
+            new_users INTEGER DEFAULT 0,
+            total_logins INTEGER DEFAULT 0,
+            total_requests INTEGER DEFAULT 0,
+            storage_used INTEGER DEFAULT 0,
+            documents_created INTEGER DEFAULT 0,
+            modules_used INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Таблица языков
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS languages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code VARCHAR(10) UNIQUE NOT NULL,
+            name VARCHAR(50) NOT NULL,
+            native_name VARCHAR(50),
+            is_active BOOLEAN DEFAULT 1,
+            is_default BOOLEAN DEFAULT 0,
+            sort_order INTEGER DEFAULT 0
+        )
+    ''')
+    
+    # Таблица переводов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS translations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            language_code VARCHAR(10) NOT NULL,
+            key VARCHAR(200) NOT NULL,
+            value TEXT NOT NULL,
+            context VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(language_code, key)
+        )
+    ''')
+    
+    conn.commit()
+    
+    # Создаем администратора по умолчанию
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    if cursor.fetchone() is None:
+        password_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+        cursor.execute('''
+            INSERT INTO users (username, email, password_hash, full_name, role, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', ('admin', 'admin@idqr.com', password_hash, 'Администратор Системы', 'admin', 'active'))
+    
+    # Добавляем стандартные модули
+    default_modules = [
+        ('Энергетика и инфраструктура', 'energy', 'Управление энергетическими объектами и инфраструктурой', 'bolt', 'infrastructure'),
+        ('Медицина и здоровье', 'medicine', 'Медицинские услуги и управление здоровьем', 'heartbeat', 'health'),
+        ('Бизнес и магазины', 'business', 'Управление бизнесом и торговыми точками', 'store', 'business'),
+        ('Образование', 'education', 'Образовательные платформы и курсы', 'graduation-cap', 'education'),
+        ('Транспорт и авто', 'transport', 'Транспортные системы и автомобили', 'car', 'transport'),
+        ('Строительство', 'construction', 'Строительные проекты и объекты', 'hard-hat', 'construction'),
+        ('ЖКХ и дома', 'housing', 'Жилищно-коммунальное хозяйство', 'home', 'housing'),
+        ('Безопасность', 'security', 'Системы безопасности и контроля', 'shield-alt', 'security'),
+        ('Документы', 'documents', 'Управление документами и файлами', 'file-alt', 'documents')
+    ]
+    
+    for name, code, description, icon, category in default_modules:
+        cursor.execute("SELECT id FROM modules WHERE code = ?", (code,))
+        if cursor.fetchone() is None:
+            cursor.execute('''
+                INSERT INTO modules (name, code, description, icon, category, enabled)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, code, description, icon, category, 1))
+    
+    # Добавляем настройки системы по умолчанию
+    default_settings = [
+        ('site_name', 'IDQR Система', 'string', 'general', 'Название сайта'),
+        ('site_description', 'Комплексная система управления', 'string', 'general', 'Описание сайта'),
+        ('site_url', 'http://localhost:5000', 'string', 'general', 'URL сайта'),
+        ('admin_email', 'admin@idqr.com', 'string', 'general', 'Email администратора'),
+        ('registration_enabled', 'true', 'boolean', 'auth', 'Разрешить регистрацию'),
+        ('email_verification', 'false', 'boolean', 'auth', 'Требовать подтверждение email'),
+        ('default_theme', 'light', 'string', 'ui', 'Тема по умолчанию'),
+        ('items_per_page', '20', 'number', 'ui', 'Элементов на странице'),
+        ('maintenance_mode', 'false', 'boolean', 'system', 'Режим обслуживания'),
+        ('backup_enabled', 'true', 'boolean', 'system', 'Автоматическое резервное копирование'),
+        ('storage_limit', '1073741824', 'number', 'storage', 'Лимит хранилища (в байтах)'),
+        ('file_size_limit', '52428800', 'number', 'storage', 'Максимальный размер файла'),
+        ('allowed_file_types', 'jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip', 'string', 'storage', 'Разрешенные типы файлов')
+    ]
+    
+    for key, value, type_, category, description in default_settings:
+        cursor.execute("SELECT id FROM system_settings WHERE setting_key = ?", (key,))
+        if cursor.fetchone() is None:
+            cursor.execute('''
+                INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (key, value, type_, category, description))
+    
+    # Добавляем языки
+    languages = [
+        ('ru', 'Русский', 'Русский', 1, 1),
+        ('en', 'English', 'English', 1, 0),
+        ('kz', 'Қазақша', 'Қазақша', 1, 0)
+    ]
+    
+    for code, name, native_name, is_active, is_default in languages:
+        cursor.execute("SELECT id FROM languages WHERE code = ?", (code,))
+        if cursor.fetchone() is None:
+            cursor.execute('''
+                INSERT INTO languages (code, name, native_name, is_active, is_default)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (code, name, native_name, is_active, is_default))
+    
+    conn.commit()
+    conn.close()
+    print("✅ База данных инициализирована")
 
-async def log_action(user_id: int, action_type: str, description: str, ip_address: str = None):
-    """Логирование действий пользователей"""
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+def hash_password(password):
+    """Хеширование пароля"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password, password_hash):
+    """Проверка пароля"""
+    return hash_password(password) == password_hash
+
+def generate_api_key():
+    """Генерация API ключа"""
+    return secrets.token_hex(32)
+
+def generate_verification_token():
+    """Генерация токена верификации"""
+    return secrets.token_hex(32)
+
+def generate_reset_token():
+    """Генерация токена сброса пароля"""
+    return secrets.token_hex(32)
+
+def log_activity(user_id, action_type, module=None, description=None, metadata=None):
+    """Логирование активности пользователя"""
+    conn = get_db_connection()
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "INSERT INTO action_logs (user_id, action_type, description, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
-                (user_id, action_type, description, ip_address, datetime.now().isoformat())
-            )
-            await db.commit()
+        ip_address = request.remote_addr if request else '127.0.0.1'
+        user_agent = request.user_agent.string if request and request.user_agent else ''
+        
+        if metadata and not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
+        
+        conn.execute('''
+            INSERT INTO user_activity (user_id, action_type, module, description, ip_address, user_agent, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, action_type, module, description, ip_address, user_agent, metadata))
+        
+        # Обновляем время последней активности пользователя
+        conn.execute('UPDATE users SET last_activity = CURRENT_TIMESTAMP WHERE id = ?', (user_id,))
+        
+        conn.commit()
     except Exception as e:
-        logger.error(f"Ошибка при логировании действия: {e}")
+        print(f"Ошибка при логировании активности: {e}")
+    finally:
+        conn.close()
 
-async def authenticate_user(username: str, password: str, ip_address: str):
+def log_error(user_id=None, error_type=None, error_message=None, stack_trace=None):
+    """Логирование ошибок"""
+    conn = get_db_connection()
     try:
-        # Сначала проверяем блокировку IP
-        if await check_ip_blocked(ip_address):
-            return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
+        request_url = request.url if request else None
+        request_method = request.method if request else None
+        request_data = json.dumps(request.form.to_dict()) if request and request.form else None
+        ip_address = request.remote_addr if request else '127.0.0.1'
+        user_agent = request.user_agent.string if request and request.user_agent else ''
         
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                "SELECT * FROM users WHERE username = ?", 
-                (username,)
-            )
-            user = await cursor.fetchone()
-            
-        if user:
-            # Проверка блокировки аккаунта
-            if user[7]:  # is_blocked
-                return {"error": "blocked", "message": "Ваш аккаунт заблокирован за нарушения"}
-            
-            # Проверка заморозки
-            if user[8]:  # frozen_until
-                freeze_until = datetime.fromisoformat(user[8])
-                if datetime.now() < freeze_until:
-                    return {
-                        "error": "frozen", 
-                        "message": f"Ваш аккаунт заморожен за нарушения. Разблокировка через: {freeze_until.strftime('%d.%m.%Y %H:%M')}"
-                    }
-                else:
-                    # Автоматическая разморозка при истечении времени
-                    async with aiosqlite.connect(DB_PATH) as db:
-                        await db.execute(
-                            "UPDATE users SET frozen_until = NULL WHERE id = ?",
-                            (user[0],)
-                        )
-                        await db.commit()
-            
-            # Проверка активности
-            if not user[4]:  # is_active
-                return {"error": "inactive", "message": "Ваш аккаунт деактивирован"}
-            
-            # Проверка пароля
-            if verify_password(password, user[2]):
-                # Обновляем IP адрес
-                async with aiosqlite.connect(DB_PATH) as db:
-                    await db.execute(
-                        "UPDATE users SET ip_address = ?, last_login = ? WHERE id = ?",
-                        (ip_address, datetime.now().isoformat(), user[0])
-                    )
-                    await db.commit()
-                
-                # Логируем вход
-                await log_action(user[0], "login", "Успешный вход в систему", ip_address)
-                return user
+        conn.execute('''
+            INSERT INTO error_logs (user_id, error_type, error_message, stack_trace, request_url, request_method, request_data, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, error_type, error_message, stack_trace, request_url, request_method, request_data, ip_address, user_agent))
         
-        # Логируем неудачную попытку входа
-        await log_action(None, "failed_login", f"Неудачная попытка входа для пользователя {username}", ip_address)
+        conn.commit()
+    except Exception as e:
+        print(f"Ошибка при логировании ошибки: {e}")
+    finally:
+        conn.close()
+
+def audit_log(user_id, action, entity_type=None, entity_id=None, old_values=None, new_values=None):
+    """Логирование действий для аудита"""
+    conn = get_db_connection()
+    try:
+        ip_address = request.remote_addr if request else '127.0.0.1'
+        user_agent = request.user_agent.string if request and request.user_agent else ''
+        
+        if old_values and not isinstance(old_values, str):
+            old_values = json.dumps(old_values)
+        
+        if new_values and not isinstance(new_values, str):
+            new_values = json.dumps(new_values)
+        
+        conn.execute('''
+            INSERT INTO audit_log (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent))
+        
+        conn.commit()
+    except Exception as e:
+        print(f"Ошибка при аудите: {e}")
+    finally:
+        conn.close()
+
+def create_notification(user_id, title, message, notification_type=None, icon=None, action_url=None, metadata=None):
+    """Создание уведомления для пользователя"""
+    conn = get_db_connection()
+    try:
+        if metadata and not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
+        
+        conn.execute('''
+            INSERT INTO notifications (user_id, title, message, notification_type, icon, action_url, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, title, message, notification_type, icon, action_url, metadata))
+        
+        conn.commit()
+    except Exception as e:
+        print(f"Ошибка при создании уведомления: {e}")
+    finally:
+        conn.close()
+
+def get_user_notifications(user_id, limit=10, unread_only=False):
+    """Получение уведомлений пользователя"""
+    conn = get_db_connection()
+    try:
+        query = 'SELECT * FROM notifications WHERE user_id = ?'
+        params = [user_id]
+        
+        if unread_only:
+            query += ' AND is_read = 0'
+        
+        query += ' ORDER BY created_at DESC LIMIT ?'
+        params.append(limit)
+        
+        notifications = conn.execute(query, params).fetchall()
+        return [dict(notification) for notification in notifications]
+    except Exception as e:
+        print(f"Ошибка при получении уведомлений: {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_system_setting(key, default=None):
+    """Получение настройки системы"""
+    conn = get_db_connection()
+    try:
+        result = conn.execute('SELECT setting_value FROM system_settings WHERE setting_key = ?', (key,)).fetchone()
+        if result:
+            return result['setting_value']
+        return default
+    except Exception as e:
+        print(f"Ошибка при получении настройки: {e}")
+        return default
+    finally:
+        conn.close()
+
+def update_system_setting(key, value):
+    """Обновление настройки системы"""
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT OR REPLACE INTO system_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        ''', (key, value))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Ошибка при обновлении настройки: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_user_by_id(user_id):
+    """Получение пользователя по ID"""
+    conn = get_db_connection()
+    try:
+        user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+        return dict(user) if user else None
+    except Exception as e:
+        print(f"Ошибка при получении пользователя: {e}")
         return None
+    finally:
+        conn.close()
+
+def get_user_by_username(username):
+    """Получение пользователя по имени пользователя"""
+    conn = get_db_connection()
+    try:
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        return dict(user) if user else None
     except Exception as e:
-        logger.error(f"Ошибка аутентификации: {e}")
+        print(f"Ошибка при получении пользователя: {e}")
         return None
+    finally:
+        conn.close()
 
-async def get_current_user(request: Request):
+def get_user_by_email(email):
+    """Получение пользователя по email"""
+    conn = get_db_connection()
     try:
-        user_id = request.session.get("user_id")
-        client_ip = request.client.host
-        
-        # Проверяем блокировку IP
-        if await check_ip_blocked(client_ip):
-            return {"error": "ip_blocked", "message": "Ваш IP-адрес заблокирован"}
-        
-        if user_id:
-            async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-                user = await cursor.fetchone()
-            
-            if user:
-                # Проверка статуса пользователя
-                if user[7]:  # is_blocked
-                    return {"error": "blocked", "message": "Ваш аккаунт заблокирован за нарушения"}
-                
-                if user[8]:  # frozen_until
-                    freeze_until = datetime.fromisoformat(user[8])
-                    if datetime.now() < freeze_until:
-                        return {
-                            "error": "frozen", 
-                            "message": f"Ваш аккаунт заморожен за нарушения. Разблокировка через: {freeze_until.strftime('%d.%m.%Y %H:%M')}"
-                        }
-                    else:
-                        # Автоматическая разморозка
-                        async with aiosqlite.connect(DB_PATH) as db:
-                            await db.execute(
-                                "UPDATE users SET frozen_until = NULL WHERE id = ?",
-                                (user[0],)
-                            )
-                            await db.commit()
-                
-                if not user[4]:  # is_active
-                    return {"error": "inactive", "message": "Ваш аккаунт деактивирован"}
-                
-                return user
-        
+        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+        return dict(user) if user else None
+    except Exception as e:
+        print(f"Ошибка при получении пользователя: {e}")
         return None
+    finally:
+        conn.close()
+
+def get_user_by_api_key(api_key):
+    """Получение пользователя по API ключу"""
+    conn = get_db_connection()
+    try:
+        user = conn.execute('SELECT * FROM users WHERE api_key = ? AND status = "active"', (api_key,)).fetchone()
+        return dict(user) if user else None
     except Exception as e:
-        logger.error(f"Ошибка в get_current_user: {e}")
+        print(f"Ошибка при получении пользователя по API ключу: {e}")
         return None
+    finally:
+        conn.close()
 
-def get_client_ip(request: Request):
-    return request.client.host
-
-# --- РЕГИСТРАЦИЯ ---
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    # Проверяем разрешена ли регистрация
+def get_user_modules(user_id):
+    """Получение модулей доступных пользователю"""
+    conn = get_db_connection()
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'")
-            result = await cursor.fetchone()
-            registration_enabled = result[0] == 'true' if result else True
-            
-        if not registration_enabled:
-            return templates.TemplateResponse("register.html", {
-                "request": request, 
-                "error": "Регистрация новых пользователей временно отключена"
-            })
+        # Проверяем роль пользователя
+        user = get_user_by_id(user_id)
+        if not user:
+            return []
+        
+        if user['role'] == 'admin':
+            # Администратор получает все модули
+            modules = conn.execute('''
+                SELECT m.*, 'full' as access_level 
+                FROM modules m 
+                WHERE m.enabled = 1 
+                ORDER BY m.name
+            ''').fetchall()
+        else:
+            # Обычные пользователи получают модули на основе разрешений
+            modules = conn.execute('''
+                SELECT DISTINCT m.*, COALESCE(uma.access_level, mp.access_level) as access_level
+                FROM modules m
+                LEFT JOIN module_permissions mp ON m.id = mp.module_id AND mp.role = ?
+                LEFT JOIN user_module_access uma ON m.id = uma.module_id AND uma.user_id = ?
+                WHERE m.enabled = 1 
+                AND (mp.can_view = 1 OR uma.access_level IS NOT NULL)
+                ORDER BY m.name
+            ''', (user['role'], user_id)).fetchall()
+        
+        return [dict(module) for module in modules]
     except Exception as e:
-        logger.error(f"Ошибка при проверке настроек регистрации: {e}")
-    
-    return templates.TemplateResponse("register.html", {"request": request})
+        print(f"Ошибка при получении модулей пользователя: {e}")
+        return []
+    finally:
+        conn.close()
 
-@app.post("/register")
-async def register(
-    request: Request, 
-    username: str = Form(...), 
-    password: str = Form(...)
-):
-    client_ip = get_client_ip(request)
-    
-    # Проверяем блокировку IP
-    if await check_ip_blocked(client_ip):
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Ваш IP-адрес заблокирован. Регистрация невозможна."
-        })
-    
-    # Проверяем разрешена ли регистрация
+def check_module_access(user_id, module_code, required_access='view'):
+    """Проверка доступа пользователя к модулю"""
+    conn = get_db_connection()
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'registration_enabled'")
-            result = await cursor.fetchone()
-            registration_enabled = result[0] == 'true' if result else True
+        user = get_user_by_id(user_id)
+        if not user:
+            return False
+        
+        if user['role'] == 'admin':
+            return True
+        
+        module = conn.execute('SELECT id FROM modules WHERE code = ? AND enabled = 1', (module_code,)).fetchone()
+        if not module:
+            return False
+        
+        # Проверяем доступ через таблицу разрешений ролей
+        permission = conn.execute('''
+            SELECT * FROM module_permissions 
+            WHERE module_id = ? AND role = ?
+        ''', (module['id'], user['role'])).fetchone()
+        
+        if permission:
+            # Проверяем уровень доступа на основе required_access
+            if required_access == 'view' and permission['can_view']:
+                return True
+            elif required_access == 'edit' and permission['can_edit']:
+                return True
+            elif required_access == 'delete' and permission['can_delete']:
+                return True
+            elif required_access == 'manage' and permission['can_manage']:
+                return True
+        
+        # Проверяем доступ через таблицу индивидуального доступа
+        user_access = conn.execute('''
+            SELECT * FROM user_module_access 
+            WHERE user_id = ? AND module_id = ?
+        ''', (user_id, module['id'])).fetchone()
+        
+        if user_access:
+            access_levels = ['view', 'edit', 'delete', 'manage']
+            user_access_index = access_levels.index(user_access['access_level']) if user_access['access_level'] in access_levels else -1
+            required_access_index = access_levels.index(required_access) if required_access in access_levels else -1
             
-        if not registration_enabled:
-            return templates.TemplateResponse("register.html", {
-                "request": request, 
-                "error": "Регистрация новых пользователей временно отключена"
-            })
+            if user_access_index >= required_access_index:
+                return True
+        
+        return False
     except Exception as e:
-        logger.error(f"Ошибка при проверке настроек регистрации: {e}")
-    
-    try:
-        # Проверяем существование пользователя
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT id FROM users WHERE username = ?", (username,))
-            existing_user = await cursor.fetchone()
+        print(f"Ошибка при проверке доступа к модулю: {e}")
+        return False
+    finally:
+        conn.close()
+
+# ==================== ДЕКОРАТОРЫ ====================
+
+def login_required(f):
+    """Декоратор для проверки авторизации"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Для доступа к этой странице необходимо войти в систему', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Декоратор для проверки прав администратора"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Для доступа к этой странице необходимо войти в систему', 'warning')
+            return redirect(url_for('login', next=request.url))
+        
+        user = get_user_by_id(session['user_id'])
+        if not user or user['role'] != 'admin':
+            flash('У вас недостаточно прав для доступа к этой странице', 'error')
+            return redirect(url_for('user_dashboard'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def module_access_required(module_code, access_level='view'):
+    """Декоратор для проверки доступа к модулю"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_id' not in session:
+                flash('Для доступа к этой странице необходимо войти в систему', 'warning')
+                return redirect(url_for('login', next=request.url))
             
+            if not check_module_access(session['user_id'], module_code, access_level):
+                flash('У вас нет доступа к этому модулю', 'error')
+                return redirect(url_for('user_dashboard'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def api_key_required(f):
+    """Декоратор для проверки API ключа"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        
+        if not api_key:
+            return jsonify({'error': 'API ключ не предоставлен'}), 401
+        
+        user = get_user_by_api_key(api_key)
+        if not user:
+            return jsonify({'error': 'Неверный API ключ'}), 401
+        
+        # Добавляем информацию о пользователе в контекст запроса
+        request.user = user
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==================== ОСНОВНЫЕ МАРШРУТЫ ====================
+
+@app.route('/')
+def index():
+    """Главная страница"""
+    if 'user_id' in session:
+        return redirect(url_for('user_dashboard'))
+    
+    # Получаем статистику для отображения на главной странице
+    conn = get_db_connection()
+    stats = {}
+    try:
+        total_users = conn.execute('SELECT COUNT(*) as count FROM users').fetchone()['count']
+        total_modules = conn.execute('SELECT COUNT(*) as count FROM modules WHERE enabled = 1').fetchone()['count']
+        stats = {
+            'total_users': total_users,
+            'total_modules': total_modules,
+            'site_name': get_system_setting('site_name', 'IDQR Система')
+        }
+    except Exception as e:
+        print(f"Ошибка при получении статистики: {e}")
+    finally:
+        conn.close()
+    
+    return render_template('index.html', stats=stats)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Страница входа"""
+    # Если пользователь уже авторизован, перенаправляем на дашборд
+    if 'user_id' in session:
+        return redirect(url_for('user_dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        remember = request.form.get('remember') == 'on'
+        
+        # Проверяем, включена ли регистрация в системе
+        if get_system_setting('registration_enabled', 'true') == 'false':
+            flash('Регистрация новых пользователей временно отключена', 'warning')
+            return render_template('login.html')
+        
+        if not username or not password:
+            flash('Пожалуйста, заполните все поля', 'error')
+            return render_template('login.html')
+        
+        # Ищем пользователя по имени пользователя или email
+        user = get_user_by_username(username)
+        if not user:
+            user = get_user_by_email(username)
+        
+        if not user:
+            flash('Неверное имя пользователя или пароль', 'error')
+            log_activity(None, 'login_failed', 'auth', f'Несуществующий пользователь: {username}')
+            return render_template('login.html')
+        
+        if user['status'] != 'active':
+            flash('Ваш аккаунт заблокирован. Обратитесь к администратору.', 'error')
+            log_activity(user['id'], 'login_blocked', 'auth', 'Аккаунт заблокирован')
+            return render_template('login.html')
+        
+        if not verify_password(password, user['password_hash']):
+            flash('Неверное имя пользователя или пароль', 'error')
+            log_activity(user['id'], 'login_failed', 'auth', 'Неверный пароль')
+            return render_template('login.html')
+        
+        # Если требуется подтверждение email
+        if get_system_setting('email_verification', 'false') == 'true' and not user['email_verified']:
+            flash('Пожалуйста, подтвердите ваш email перед входом', 'warning')
+            return redirect(url_for('verify_email_request'))
+        
+        # Создаем сессию
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        session['role'] = user['role']
+        session['theme'] = user['theme']
+        session['language'] = user['language']
+        
+        if remember:
+            session.permanent = True
+            app.permanent_session_lifetime = timedelta(days=30)
+        else:
+            session.permanent = False
+            app.permanent_session_lifetime = timedelta(hours=12)
+        
+        # Обновляем информацию о пользователе
+        conn = get_db_connection()
+        try:
+            conn.execute('''
+                UPDATE users 
+                SET last_login = CURRENT_TIMESTAMP, 
+                    login_count = login_count + 1,
+                    last_activity = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (user['id'],))
+            
+            # Создаем запись в таблице сессий
+            session_id = secrets.token_hex(32)
+            expires_at = datetime.now() + app.permanent_session_lifetime
+            
+            conn.execute('''
+                INSERT INTO sessions (user_id, session_id, ip_address, user_agent, expires_at)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (user['id'], session_id, request.remote_addr, request.user_agent.string, expires_at))
+            
+            conn.commit()
+        except Exception as e:
+            print(f"Ошибка при обновлении информации о пользователе: {e}")
+        finally:
+            conn.close()
+        
+        # Логируем успешный вход
+        log_activity(user['id'], 'login', 'auth', 'Успешный вход в систему')
+        
+        flash(f'Добро пожаловать, {user["full_name"] or user["username"]}!', 'success')
+        
+        # Перенаправляем на следующую страницу или дашборд
+        next_page = request.args.get('next')
+        if next_page and is_safe_url(next_page):
+            return redirect(next_page)
+        
+        if user['role'] == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('user_dashboard'))
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Страница регистрации"""
+    # Если пользователь уже авторизован, перенаправляем на дашборд
+    if 'user_id' in session:
+        return redirect(url_for('user_dashboard'))
+    
+    # Проверяем, включена ли регистрация в системе
+    if get_system_setting('registration_enabled', 'true') == 'false':
+        flash('Регистрация новых пользователей временно отключена', 'warning')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        company = request.form.get('company', '').strip()
+        position = request.form.get('position', '').strip()
+        agree_terms = request.form.get('agree_terms') == 'on'
+        
+        # Валидация
+        errors = []
+        
+        if not username or len(username) < 3:
+            errors.append('Имя пользователя должно содержать минимум 3 символа')
+        
+        if not email or '@' not in email:
+            errors.append('Введите корректный email адрес')
+        
+        if not password or len(password) < 6:
+            errors.append('Пароль должен содержать минимум 6 символов')
+        
+        if password != confirm_password:
+            errors.append('Пароли не совпадают')
+        
+        if not agree_terms:
+            errors.append('Необходимо согласиться с условиями использования')
+        
+        # Проверяем уникальность имени пользователя и email
+        conn = get_db_connection()
+        try:
+            existing_user = conn.execute('SELECT id FROM users WHERE username = ? OR email = ?', 
+                                        (username, email)).fetchone()
             if existing_user:
-                return templates.TemplateResponse("register.html", {
-                    "request": request, 
-                    "error": "Пользователь с таким именем уже существует"
-                })
+                errors.append('Пользователь с таким именем или email уже существует')
+        except Exception as e:
+            print(f"Ошибка при проверке пользователя: {e}")
+            errors.append('Произошла ошибка при регистрации')
+        finally:
+            conn.close()
+        
+        if errors:
+            for error in errors:
+                flash(error, 'error')
+            return render_template('register.html', 
+                                 username=username, email=email, full_name=full_name,
+                                 phone=phone, company=company, position=position)
+        
+        # Регистрируем пользователя
+        conn = get_db_connection()
+        try:
+            password_hash = hash_password(password)
+            verification_token = generate_verification_token() if get_system_setting('email_verification', 'false') == 'true' else None
             
-            # Создаем пользователя с ролью 'user' по умолчанию
-            password_hash = get_password_hash(password)
-            created_at = datetime.now().isoformat()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash, full_name, phone, company, position, 
+                                 role, status, theme, language, verification_token, email_verified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (username, email, password_hash, full_name, phone, company, position,
+                 'user', 'active', 'light', 'ru', verification_token, verification_token is None))
             
-            await db.execute(
-                "INSERT INTO users (username, password_hash, role, created_at, ip_address) VALUES (?, ?, ?, ?, ?)",
-                (username, password_hash, "user", created_at, client_ip)
-            )
-            await db.commit()
+            user_id = cursor.lastrowid
             
-            # Получаем ID нового пользователя
-            cursor = await db.execute("SELECT id FROM users WHERE username = ?", (username,))
-            new_user = await cursor.fetchone()
+            # Генерируем API ключ
+            api_key = generate_api_key()
+            conn.execute('UPDATE users SET api_key = ? WHERE id = ?', (api_key, user_id))
+            
+            conn.commit()
             
             # Логируем регистрацию
-            await log_action(new_user[0], "registration", "Новый пользователь зарегистрирован", client_ip)
+            log_activity(user_id, 'register', 'auth', 'Регистрация нового пользователя')
             
-        return RedirectResponse(url="/user/login", status_code=303)
-        
-    except Exception as e:
-        logger.error(f"Ошибка при регистрации: {e}")
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Ошибка при регистрации"
-        })
-
-# --- ГЛАВНАЯ СТРАНИЦА ---
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    client_ip = get_client_ip(request)
-    
-    # Проверяем блокировку IP
-    if await check_ip_blocked(client_ip):
-        return templates.TemplateResponse("ip_blocked.html", {
-            "request": request,
-            "message": "Ваш IP-адрес заблокирован"
-        })
-    
-    # Проверяем, авторизован ли пользователь
-    user = await get_current_user(request)
-    if user and not isinstance(user, dict):
-        if user[3] == "admin":
-            return RedirectResponse(url="/dashboard/qr", status_code=303)
-        else:
-            return RedirectResponse(url="/user/dashboard", status_code=303)
-    elif isinstance(user, dict):
-        # Пользователь заблокирован или заморожен
-        if user["error"] == "frozen":
-            return templates.TemplateResponse("account_frozen.html", {
-                "request": request,
-                "message": user["message"]
-            })
-        else:
-            return templates.TemplateResponse("user_blocked.html", {
-                "request": request,
-                "message": user["message"]
-            })
-    
-    return templates.TemplateResponse("index.html", {"request": request})
-
-# --- ВХОД АДМИНИСТРАТОРА ---
-@app.post("/login", response_class=HTMLResponse)
-async def login(request: Request, code: str = Form(...)):
-    if code == ADMIN_CODE:
-        # Находим пользователя admin
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM users WHERE username = 'admin'")
-            admin_user = await cursor.fetchone()
-        
-        if admin_user:
-            request.session["user_id"] = admin_user[0]
-            request.session["user_role"] = admin_user[3]
-            
-            # Логируем вход администратора
-            await log_action(admin_user[0], "admin_login", "Вход администратора через код", get_client_ip(request))
-            
-            return RedirectResponse(url="/dashboard/qr", status_code=303)
-    
-    return templates.TemplateResponse("index.html", {
-        "request": request, 
-        "error": "Неверный код",
-        "show_user_hint": True
-    })
-
-# --- ВХОД ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/user/login", response_class=HTMLResponse)
-async def user_login_page(request: Request):
-    return templates.TemplateResponse("user_login.html", {"request": request})
-
-@app.post("/user/login", response_class=HTMLResponse)
-async def user_login(request: Request, username: str = Form(...), password: str = Form(...)):
-    client_ip = get_client_ip(request)
-    result = await authenticate_user(username, password, client_ip)
-    
-    if isinstance(result, dict) and "error" in result:
-        if result["error"] == "frozen":
-            return templates.TemplateResponse("account_frozen.html", {
-                "request": request,
-                "message": result["message"]
-            })
-        else:
-            return templates.TemplateResponse("user_login.html", {
-                "request": request, 
-                "error": result["message"]
-            })
-    elif result:
-        request.session["user_id"] = result[0]
-        request.session["user_role"] = result[3]
-        return RedirectResponse(url="/user/dashboard", status_code=303)
-    
-    return templates.TemplateResponse("user_login.html", {
-        "request": request, 
-        "error": "Неверный логин или пароль"
-    })
-
-# --- ВЫХОД ---
-@app.get("/logout")
-async def logout(request: Request):
-    user_id = request.session.get("user_id")
-    if user_id:
-        await log_action(user_id, "logout", "Выход из системы", get_client_ip(request))
-    
-    request.session.clear()
-    return RedirectResponse(url="/", status_code=303)
-
-# --- ПАНЕЛЬ АДМИНИСТРАТОРА ---
-async def check_admin(request: Request):
-    user = await get_current_user(request)
-    if isinstance(user, dict):
-        return user
-    if not user or user[3] != "admin":
-        return RedirectResponse(url="/", status_code=303)
-    return user
-
-# --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ/ИП ---
-async def check_user_access(request: Request):
-    user = await get_current_user(request)
-    if isinstance(user, dict):
-        return user
-    if not user:
-        return RedirectResponse(url="/user/login", status_code=303)
-    return user
-
-async def check_ip_access(request: Request):
-    """Проверка доступа для ИП (может создавать QR)"""
-    user = await get_current_user(request)
-    if isinstance(user, dict):
-        return user
-    if not user:
-        return RedirectResponse(url="/user/login", status_code=303)
-    if user[3] not in ["ip", "admin"]:
-        return RedirectResponse(url="/user/dashboard", status_code=303)
-    return user
-
-# --- QR-КОДЫ (для админа и ИП) ---
-@app.get("/dashboard/qr", response_class=HTMLResponse)
-async def dashboard_qr(request: Request):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            if user[3] == "admin":
-                cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
+            # Если требуется подтверждение email
+            if verification_token:
+                # Здесь должна быть отправка email с подтверждением
+                flash('Регистрация прошла успешно! Пожалуйста, проверьте ваш email для подтверждения.', 'success')
+                return redirect(url_for('verify_email_request'))
             else:
-                cursor = await db.execute("SELECT * FROM qr_codes WHERE user_id = ? ORDER BY id DESC", (user[0],))
-            qr_list = await cursor.fetchall()
-        
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": qr_list,
-            "qr_url": None,
-            "qr_title": None,
-            "active": "qr",
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке QR-кодов: {e}")
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": [],
-            "qr_url": None,
-            "qr_title": None,
-            "active": "qr",
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
+                flash('Регистрация прошла успешно! Теперь вы можете войти в систему.', 'success')
+                return redirect(url_for('login'))
+                
+        except Exception as e:
+            print(f"Ошибка при регистрации пользователя: {e}")
+            flash('Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.', 'error')
+            return render_template('register.html')
+        finally:
+            conn.close()
+    
+    return render_template('register.html')
 
-# --- Генерация QR (для админа и ИП) ---
-@app.post("/generate_qr")
-async def generate_qr(
-    request: Request, 
-    qrdata: str = Form(...), 
-    title: str = Form(...),
-    qr_color: str = Form("#000000"),
-    text_color: str = Form("#000000")
-):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/logout')
+@login_required
+def logout():
+    """Выход из системы"""
+    user_id = session.get('user_id')
+    
+    # Логируем выход
+    log_activity(user_id, 'logout', 'auth', 'Выход из системы')
+    
+    # Очищаем сессию
+    session.clear()
+    
+    flash('Вы успешно вышли из системы', 'success')
+    return redirect(url_for('index'))
+
+# ==================== ПОЛЬЗОВАТЕЛЬСКИЕ МАРШРУТЫ ====================
+
+@app.route('/user/dashboard')
+@login_required
+def user_dashboard():
+    """Панель управления пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем модули пользователя
+    modules = get_user_modules(user['id'])
+    
+    # Получаем последние активности
+    conn = get_db_connection()
+    activities = []
+    notifications = []
     
     try:
-        # Проверяем лимит QR-кодов для пользователя
-        if user[3] != "admin":
-            async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.execute("SELECT COUNT(*) FROM qr_codes WHERE user_id = ?", (user[0],))
-                qr_count = await cursor.fetchone()
-                
-                cursor = await db.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'max_qr_per_user'")
-                max_qr_result = await cursor.fetchone()
-                max_qr = int(max_qr_result[0]) if max_qr_result else 50
-                
-                if qr_count[0] >= max_qr:
-                    return templates.TemplateResponse("qr.html", {
-                        "request": request,
-                        "error": f"Превышен лимит QR-кодов. Максимум: {max_qr}",
-                        "user": user
-                    })
+        # Получаем последние активности
+        activities = conn.execute('''
+            SELECT * FROM user_activity 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 10
+        ''', (user['id'],)).fetchall()
         
-        # Генерируем уникальное имя файла
-        filename = f"{uuid.uuid4()}.png"
-        filepath = os.path.join(QR_FOLDER, filename)
+        # Получаем непрочитанные уведомления
+        notifications = conn.execute('''
+            SELECT * FROM notifications 
+            WHERE user_id = ? AND is_read = 0 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ''', (user['id'],)).fetchall()
+        
+        # Получаем статистику пользователя
+        stats = {
+            'documents': conn.execute('SELECT COUNT(*) as count FROM documents WHERE user_id = ?', 
+                                     (user['id'],)).fetchone()['count'],
+            'modules': len(modules),
+            'last_login': user['last_login']
+        }
+        
+    except Exception as e:
+        print(f"Ошибка при получении данных для дашборда: {e}")
+        stats = {'documents': 0, 'modules': 0, 'last_login': None}
+    finally:
+        conn.close()
+    
+    # Логируем просмотр дашборда
+    log_activity(user['id'], 'view_dashboard', 'user', 'Просмотр панели управления')
+    
+    return render_template('user_dashboard.html', 
+                         user=user, 
+                         modules=modules,
+                         activities=activities,
+                         notifications=notifications,
+                         stats=stats)
 
-        # Сохраняем цвета в формате JSON
-        colors_json = json.dumps({
-            "qr_color": qr_color,
-            "bg_color": "#FFFFFF",
-            "text_color": text_color
-        })
-
-        # Создаем запись в БД
-        async with aiosqlite.connect(DB_PATH) as db:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor = await db.execute(
-                "INSERT INTO qr_codes (title, data, filename, created_at, colors, user_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (title, qrdata, filename, now, colors_json, user[0])
-            )
-            await db.commit()
-            qr_id = cursor.lastrowid
-
-        # Генерируем QR-код
-        scan_url = f"{BASE_URL}/scan/{qr_id}"
+@app.route('/user/profile', methods=['GET', 'POST'])
+@login_required
+def user_profile():
+    """Профиль пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        company = request.form.get('company', '').strip()
+        position = request.form.get('position', '').strip()
+        language = request.form.get('language', 'ru')
+        theme = request.form.get('theme', 'light')
         
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(scan_url)
-        qr.make(fit=True)
+        # Обновляем аватар
+        avatar_file = request.files.get('avatar')
+        avatar_path = user.get('avatar')
         
-        qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
+        if avatar_file and avatar_file.filename:
+            filename = secure_filename(f"{user['id']}_{avatar_file.filename}")
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'avatars', filename)
+            
+            # Создаем папку если ее нет
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            # Сохраняем файл
+            avatar_file.save(filepath)
+            avatar_path = f"uploads/avatars/{filename}"
         
-        # Добавляем текст
+        conn = get_db_connection()
         try:
-            font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
-        except IOError:
-            font = ImageFont.load_default()
-        
-        max_chars_per_line = 20
-        wrapped_text = textwrap.fill(title, width=max_chars_per_line)
-        lines = wrapped_text.split('\n')
-        
-        line_height = 30
-        text_height = len(lines) * line_height + 20
-        
-        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
-        new_img.paste(qr_img, (0, text_height))
-        
-        draw = ImageDraw.Draw(new_img)
-        y = 10
-        for line in lines:
-            text_bbox = draw.textbbox((0, 0), line, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_x = (new_img.width - text_width) // 2
-            draw.text((text_x, y), line, font=font, fill=text_color)
-            y += line_height
-        
-        new_img.save(filepath)
-
-        # Логируем создание QR-кода
-        await log_action(user[0], "qr_create", f"Создан QR-код: {title}")
-        
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
+            # Сохраняем старые значения для аудита
+            old_values = {
+                'full_name': user['full_name'],
+                'phone': user['phone'],
+                'company': user['company'],
+                'position': user['position'],
+                'language': user['language'],
+                'theme': user['theme'],
+                'avatar': user['avatar']
+            }
+            
+            # Обновляем профиль
+            conn.execute('''
+                UPDATE users 
+                SET full_name = ?, phone = ?, company = ?, position = ?, 
+                    language = ?, theme = ?, avatar = ?
+                WHERE id = ?
+            ''', (full_name, phone, company, position, language, theme, avatar_path, user['id']))
+            
+            # Получаем новые значения
+            new_values = {
+                'full_name': full_name,
+                'phone': phone,
+                'company': company,
+                'position': position,
+                'language': language,
+                'theme': theme,
+                'avatar': avatar_path
+            }
+            
+            # Аудит изменений
+            audit_log(user['id'], 'update_profile', 'user', user['id'], old_values, new_values)
+            
+            conn.commit()
+            
+            # Обновляем данные в сессии
+            session['theme'] = theme
+            session['language'] = language
+            
+            flash('Профиль успешно обновлен', 'success')
+            
+            # Обновляем объект пользователя
+            user = get_user_by_id(user['id'])
+            
+        except Exception as e:
+            print(f"Ошибка при обновлении профиля: {e}")
+            flash('Произошла ошибка при обновлении профиля', 'error')
+        finally:
+            conn.close()
     
-    except Exception as e:
-        logger.error(f"Ошибка при генерации QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- Просмотр QR кода ---
-@app.get("/dashboard/qr/view/{qr_id}", response_class=HTMLResponse)
-async def view_qr(request: Request, qr_id: int):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    # Логируем просмотр профиля
+    log_activity(user['id'], 'view_profile', 'user', 'Просмотр профиля')
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
-            qr_code = await cursor.fetchone()
-            
-            if not qr_code:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-                
-            # Проверяем права доступа
-            if user[3] != "admin" and qr_code[8] != user[0]:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-                
-            qr_url = f"/static/qr/{qr_code[3]}"
-            
-            return templates.TemplateResponse("view_qr.html", {
-                "request": request,
-                "qr_code": qr_code,
-                "qr_url": qr_url,
-                "active": "qr",
-                "user": user
-            })
-    except Exception as e:
-        logger.error(f"Ошибка при просмотре QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
+    return render_template('user_profile.html', user=user)
 
-# --- Редактирование QR кода ---
-@app.get("/dashboard/qr/edit/{qr_id}", response_class=HTMLResponse)
-async def edit_qr_page(request: Request, qr_id: int):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/user/settings', methods=['GET', 'POST'])
+@login_required
+def user_settings():
+    """Настройки пользователя"""
+    user = get_user_by_id(session['user_id'])
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
-            qr_code = await cursor.fetchone()
-            
-            if not qr_code:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-                
-            # Проверяем права доступа
-            if user[3] != "admin" and qr_code[8] != user[0]:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-            
-            # Получаем цвета
-            colors = json.loads(qr_code[7]) if qr_code[7] else {"qr_color": "#000000", "bg_color": "#FFFFFF", "text_color": "#000000"}
-            
-            return templates.TemplateResponse("edit_qr.html", {
-                "request": request,
-                "qr_code": qr_code,
-                "colors": colors,
-                "active": "qr",
-                "user": user
-            })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке формы редактирования QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- Обновление QR кода ---
-@app.post("/dashboard/qr/update/{qr_id}")
-async def update_qr(
-    request: Request, 
-    qr_id: int,
-    title: str = Form(...),
-    qrdata: str = Form(...),
-    qr_color: str = Form("#000000"),
-    text_color: str = Form("#000000")
-):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
     
-    try:
-        # Получаем старый QR-код
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM qr_codes WHERE id = ?", (qr_id,))
-            old_qr = await cursor.fetchone()
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'change_password':
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
             
-            if not old_qr:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-                
-            # Проверяем права доступа
-            if user[3] != "admin" and old_qr[8] != user[0]:
-                return RedirectResponse(url="/dashboard/qr", status_code=303)
-            
-            # Обновляем данные в БД
-            colors_json = json.dumps({
-                "qr_color": qr_color,
-                "bg_color": "#FFFFFF",
-                "text_color": text_color
-            })
-            
-            await db.execute(
-                "UPDATE qr_codes SET title = ?, data = ?, colors = ? WHERE id = ?",
-                (title, qrdata, colors_json, qr_id)
-            )
-            await db.commit()
-        
-        # Перегенерируем QR-код
-        filename = old_qr[3]
-        filepath = os.path.join(QR_FOLDER, filename)
-        
-        scan_url = f"{BASE_URL}/scan/{qr_id}"
-        
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(scan_url)
-        qr.make(fit=True)
-        
-        qr_img = qr.make_image(fill_color=qr_color, back_color="white").convert("RGB")
-        
-        # Добавляем текст
-        try:
-            font = ImageFont.truetype("static/fonts/RobotoSlab-Bold.ttf", 28)
-        except IOError:
-            font = ImageFont.load_default()
-        
-        max_chars_per_line = 20
-        wrapped_text = textwrap.fill(title, width=max_chars_per_line)
-        lines = wrapped_text.split('\n')
-        
-        line_height = 30
-        text_height = len(lines) * line_height + 20
-        
-        new_img = Image.new("RGB", (qr_img.width, qr_img.height + text_height), "white")
-        new_img.paste(qr_img, (0, text_height))
-        
-        draw = ImageDraw.Draw(new_img)
-        y = 10
-        for line in lines:
-            text_bbox = draw.textbbox((0, 0), line, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_x = (new_img.width - text_width) // 2
-            draw.text((text_x, y), line, font=font, fill=text_color)
-            y += line_height
-        
-        new_img.save(filepath)
-
-        # Логируем обновление QR-кода
-        await log_action(user[0], "qr_update", f"Обновлен QR-код: {title}")
-        
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-    
-    except Exception as e:
-        logger.error(f"Ошибка при обновлении QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- СКАНИРОВАНИЕ QR ---
-@app.get("/scan/{qr_id}")
-async def scan_qr(qr_id: int):
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT data, scan_count FROM qr_codes WHERE id = ?", (qr_id,))
-            row = await cursor.fetchone()
-            if row:
-                data, scan_count = row
-                await db.execute(
-                    "UPDATE qr_codes SET scan_count = ?, last_scan = ? WHERE id = ?",
-                    (scan_count + 1, datetime.now().isoformat(), qr_id)
-                )
-                await db.commit()
-                return RedirectResponse(data)
-        return RedirectResponse("/", status_code=303)
-    except Exception as e:
-        logger.error(f"Ошибка при сканировании QR-кода: {e}")
-        return RedirectResponse("/", status_code=303)
-
-# --- УДАЛЕНИЕ QR ---
-@app.get("/delete_qr/{qr_id}")
-async def delete_qr(request: Request, qr_id: int):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # Проверяем владельца QR-кода
-            cursor = await db.execute("SELECT user_id, title FROM qr_codes WHERE id = ?", (qr_id,))
-            qr_owner = await cursor.fetchone()
-            
-            if qr_owner and (user[3] == "admin" or qr_owner[0] == user[0]):
-                cursor = await db.execute("SELECT filename FROM qr_codes WHERE id = ?", (qr_id,))
-                row = await cursor.fetchone()
-                if row:
-                    filename = row[0]
-                    path = os.path.join(QR_FOLDER, filename)
-                    if os.path.exists(path):
-                        os.remove(path)
-                    await db.execute("DELETE FROM qr_codes WHERE id = ?", (qr_id,))
-                    await db.commit()
+            if not current_password or not new_password or not confirm_password:
+                flash('Заполните все поля', 'error')
+            elif new_password != confirm_password:
+                flash('Новые пароли не совпадают', 'error')
+            elif not verify_password(current_password, user['password_hash']):
+                flash('Текущий пароль неверен', 'error')
+            elif len(new_password) < 6:
+                flash('Новый пароль должен содержать минимум 6 символов', 'error')
+            else:
+                # Меняем пароль
+                new_password_hash = hash_password(new_password)
+                conn = get_db_connection()
+                try:
+                    conn.execute('UPDATE users SET password_hash = ? WHERE id = ?', 
+                                (new_password_hash, user['id']))
+                    conn.commit()
                     
-                    # Логируем удаление QR-кода
-                    await log_action(user[0], "qr_delete", f"Удален QR-код: {qr_owner[1]}")
+                    # Аудит изменения пароля
+                    audit_log(user['id'], 'change_password', 'user', user['id'])
+                    
+                    # Отправляем уведомление
+                    create_notification(user['id'], 'Пароль изменен', 
+                                       'Ваш пароль был успешно изменен.', 
+                                       'security', 'lock')
+                    
+                    flash('Пароль успешно изменен', 'success')
+                    
+                except Exception as e:
+                    print(f"Ошибка при изменении пароля: {e}")
+                    flash('Произошла ошибка при изменении пароля', 'error')
+                finally:
+                    conn.close()
         
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-    except Exception as e:
-        logger.error(f"Ошибка при удалении QR-кода: {e}")
-        return RedirectResponse(url="/dashboard/qr", status_code=303)
-
-# --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (админ) ---
-@app.get("/dashboard/users", response_class=HTMLResponse)
-async def users_management(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("""
-                SELECT id, username, role, is_active, created_at, last_login, 
-                       is_blocked, frozen_until, block_count, ip_address 
-                FROM users ORDER BY id DESC
-            """)
-            users_list = await cursor.fetchall()
+        elif action == 'update_notifications':
+            # Здесь можно добавить логику для обновления настроек уведомлений
+            flash('Настройки уведомлений обновлены', 'success')
         
-        return templates.TemplateResponse("users.html", {
-            "request": request,
-            "active": "users",
-            "users_list": users_list,
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке пользователей: {e}")
-        return templates.TemplateResponse("users.html", {
-            "request": request,
-            "active": "users",
-            "users_list": [],
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
-
-# --- ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (админ) ---
-@app.post("/dashboard/users/add")
-async def add_user(
-    request: Request, 
-    username: str = Form(...), 
-    password: str = Form(...),
-    role: str = Form("user")
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        password_hash = get_password_hash(password)
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-                (username, password_hash, role, datetime.now().isoformat())
-            )
-            await db.commit()
-            
-            # Логируем добавление пользователя
-            await log_action(user[0], "user_add", f"Добавлен пользователь: {username} с ролью {role}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при добавлении пользователя: {e}")
-    
-    return RedirectResponse(url="/dashboard/users", status_code=303)
-
-# --- ИЗМЕНЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЯ (админ) ---
-@app.post("/dashboard/users/change_role/{user_id}")
-async def change_user_role(
-    request: Request, 
-    user_id: int,
-    new_role: str = Form(...)
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # Нельзя менять роль администратора
-            cursor = await db.execute("SELECT role, username FROM users WHERE id = ?", (user_id,))
-            current_user = await cursor.fetchone()
-            
-            if current_user and current_user[0] != "admin":
-                await db.execute(
-                    "UPDATE users SET role = ? WHERE id = ?",
-                    (new_role, user_id)
-                )
-                await db.commit()
+        elif action == 'generate_api_key':
+            # Генерируем новый API ключ
+            new_api_key = generate_api_key()
+            conn = get_db_connection()
+            try:
+                conn.execute('UPDATE users SET api_key = ? WHERE id = ?', 
+                            (new_api_key, user['id']))
+                conn.commit()
                 
-                # Логируем изменение роли
-                await log_action(user[0], "user_role_change", f"Изменена роль пользователя {current_user[1]} на {new_role}")
+                # Аудит генерации API ключа
+                audit_log(user['id'], 'generate_api_key', 'user', user['id'])
                 
-    except Exception as e:
-        logger.error(f"Ошибка при изменении роли пользователя: {e}")
+                flash(f'Новый API ключ сгенерирован: {new_api_key}', 'success')
+                
+            except Exception as e:
+                print(f"Ошибка при генерации API ключа: {e}")
+                flash('Произошла ошибка при генерации API ключа', 'error')
+            finally:
+                conn.close()
     
-    return RedirectResponse(url="/dashboard/users", status_code=303)
+    # Логируем просмотр настроек
+    log_activity(user['id'], 'view_settings', 'user', 'Просмотр настроек')
+    
+    return render_template('user_settings.html', user=user)
 
-# --- БЛОКИРОВКА/ЗАМОРОЗКА ПОЛЬЗОВАТЕЛЯ С ВЫБОРОМ ВРЕМЕНИ ---
-@app.post("/dashboard/users/block/{user_id}")
-async def block_user(
-    request: Request, 
-    user_id: int,
-    block_type: str = Form(...),
-    block_duration: str = Form("1"),
-    block_unit: str = Form("hours")
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/user/notifications')
+@login_required
+def user_notifications():
+    """Уведомления пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем все уведомления пользователя
+    notifications = get_user_notifications(user['id'], limit=50)
+    
+    # Логируем просмотр уведомлений
+    log_activity(user['id'], 'view_notifications', 'user', 'Просмотр уведомлений')
+    
+    return render_template('user_notifications.html', user=user, notifications=notifications)
+
+@app.route('/user/notifications/mark-read/<int:notification_id>')
+@login_required
+def mark_notification_read(notification_id):
+    """Пометить уведомление как прочитанное"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 401
+    
+    conn = get_db_connection()
+    try:
+        # Проверяем, принадлежит ли уведомление пользователю
+        notification = conn.execute('SELECT * FROM notifications WHERE id = ? AND user_id = ?', 
+                                   (notification_id, user['id'])).fetchone()
+        
+        if not notification:
+            return jsonify({'success': False, 'error': 'Уведомление не найдено'}), 404
+        
+        # Помечаем как прочитанное
+        conn.execute('UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE id = ?', 
+                    (notification_id,))
+        conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Ошибка при отметке уведомления как прочитанного: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/user/notifications/mark-all-read')
+@login_required
+def mark_all_notifications_read():
+    """Пометить все уведомления как прочитанные"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 401
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            UPDATE notifications 
+            SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+            WHERE user_id = ? AND is_read = 0
+        ''', (user['id'],))
+        conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Ошибка при отметке всех уведомлений как прочитанных: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/user/activity')
+@login_required
+def user_activity():
+    """Активность пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем параметры фильтрации
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    module_filter = request.args.get('module', '')
+    action_filter = request.args.get('action', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Строим запрос
+    conn = get_db_connection()
+    try:
+        query = 'SELECT * FROM user_activity WHERE user_id = ?'
+        params = [user['id']]
+        
+        if module_filter:
+            query += ' AND module = ?'
+            params.append(module_filter)
+        
+        if action_filter:
+            query += ' AND action_type = ?'
+            params.append(action_filter)
+        
+        if date_from:
+            query += ' AND DATE(created_at) >= ?'
+            params.append(date_from)
+        
+        if date_to:
+            query += ' AND DATE(created_at) <= ?'
+            params.append(date_to)
+        
+        query += ' ORDER BY created_at DESC'
+        
+        # Получаем общее количество записей
+        count_query = query.replace('SELECT *', 'SELECT COUNT(*) as count', 1)
+        total_count = conn.execute(count_query, params).fetchone()['count']
+        
+        # Добавляем пагинацию
+        query += ' LIMIT ? OFFSET ?'
+        params.extend([per_page, (page - 1) * per_page])
+        
+        activities = conn.execute(query, params).fetchall()
+        
+        # Получаем уникальные модули для фильтра
+        modules = conn.execute('''
+            SELECT DISTINCT module FROM user_activity 
+            WHERE user_id = ? AND module IS NOT NULL 
+            ORDER BY module
+        ''', (user['id'],)).fetchall()
+        
+        # Получаем уникальные действия для фильтра
+        actions = conn.execute('''
+            SELECT DISTINCT action_type FROM user_activity 
+            WHERE user_id = ? AND action_type IS NOT NULL 
+            ORDER BY action_type
+        ''', (user['id'],)).fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении активности: {e}")
+        activities = []
+        modules = []
+        actions = []
+        total_count = 0
+    finally:
+        conn.close()
+    
+    # Логируем просмотр активности
+    log_activity(user['id'], 'view_activity', 'user', 'Просмотр истории активности')
+    
+    return render_template('user_activity.html', 
+                         user=user, 
+                         activities=activities,
+                         modules=modules,
+                         actions=actions,
+                         page=page,
+                         per_page=per_page,
+                         total_count=total_count,
+                         filters={
+                             'module': module_filter,
+                             'action': action_filter,
+                             'date_from': date_from,
+                             'date_to': date_to
+                         })
+
+# ==================== МОДУЛИ ====================
+
+@app.route('/modules')
+def modules_page():
+    """Страница всех модулей"""
+    # Получаем тему из сессии или настройки системы
+    theme = 'light'
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        if user:
+            theme = user['theme']
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    # Получаем все активные модули
+    conn = get_db_connection()
+    try:
+        modules = conn.execute('''
+            SELECT m.*, c.name as category_name, c.icon as category_icon, c.color as category_color
+            FROM modules m
+            LEFT JOIN module_categories c ON m.category = c.code
+            WHERE m.enabled = 1
+            ORDER BY c.sort_order, m.name
+        ''').fetchall()
+        
+        # Группируем модули по категориям
+        categories = {}
+        for module in modules:
+            category_name = module['category_name'] or 'Другие'
+            if category_name not in categories:
+                categories[category_name] = {
+                    'icon': module['category_icon'],
+                    'color': module['category_color'],
+                    'modules': []
+                }
+            categories[category_name]['modules'].append(dict(module))
+        
+    except Exception as e:
+        print(f"Ошибка при получении модулей: {e}")
+        categories = {}
+    finally:
+        conn.close()
+    
+    # Если пользователь авторизован, логируем просмотр
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_modules', 'system', 'Просмотр всех модулей')
+    
+    return render_template('modules.html', categories=categories, theme=theme)
+
+@app.route('/user/modules')
+@login_required
+def user_modules():
+    """Модули пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем модули пользователя
+    modules = get_user_modules(user['id'])
+    
+    # Группируем модули по категориям
+    categories = {}
+    for module in modules:
+        category = module.get('category', 'other')
+        if category not in categories:
+            categories[category] = []
+        categories[category].append(module)
+    
+    # Логируем просмотр модулей
+    log_activity(user['id'], 'view_user_modules', 'user', 'Просмотр доступных модулей')
+    
+    return render_template('user_modules.html', user=user, categories=categories)
+
+# ==================== МЕДИЦИНА ====================
+
+@app.route('/medicine')
+def medicine_page():
+    """Общая страница медицины"""
+    # Получаем тему из сессии или настройки системы
+    theme = 'light'
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        if user:
+            theme = user['theme']
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    # Логируем просмотр
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_medicine', 'medicine', 'Просмотр страницы медицины')
+    
+    return render_template('medicine.html', theme=theme)
+
+@app.route('/user/medicine')
+@login_required
+@module_access_required('medicine', 'view')
+def user_medicine():
+    """Модуль медицины для пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Логируем доступ к модулю
+    log_activity(user['id'], 'access_module', 'medicine', 'Доступ к модулю медицины')
+    
+    return render_template('user_medicine.html', user=user)
+
+# ==================== ЭНЕРГЕТИКА ====================
+
+@app.route('/user/energy')
+@login_required
+@module_access_required('energy', 'view')
+def user_energy():
+    """Модуль энергетики для пользователя"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Логируем доступ к модулю
+    log_activity(user['id'], 'access_module', 'energy', 'Доступ к модулю энергетики')
+    
+    return render_template('user_energy.html', user=user)
+
+@app.route('/energy/complaints')
+@login_required
+@module_access_required('energy', 'view')
+def energy_complaints():
+    """Жалобы и обращения в энергетике"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Логируем доступ к модулю
+    log_activity(user['id'], 'access_module', 'energy', 'Доступ к жалобам и обращениям в энергетике')
+    
+    return render_template('energy_complaints.html', user=user)
+
+# ==================== АДМИНИСТРАТИВНЫЕ МАРШРУТЫ ====================
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Панель администратора"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем статистику для админ-панели
+    conn = get_db_connection()
+    stats = {}
     
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-            target_user = await cursor.fetchone()
+        # Общая статистика
+        stats['total_users'] = conn.execute('SELECT COUNT(*) as count FROM users').fetchone()['count']
+        stats['active_users'] = conn.execute('SELECT COUNT(*) as count FROM users WHERE status = "active"').fetchone()['count']
+        stats['total_modules'] = conn.execute('SELECT COUNT(*) as count FROM modules').fetchone()['count']
+        stats['active_modules'] = conn.execute('SELECT COUNT(*) as count FROM modules WHERE enabled = 1').fetchone()['count']
+        
+        # Статистика за сегодня
+        today = datetime.now().strftime('%Y-%m-%d')
+        stats['new_users_today'] = conn.execute('SELECT COUNT(*) as count FROM users WHERE DATE(created_at) = ?', 
+                                               (today,)).fetchone()['count']
+        stats['logins_today'] = conn.execute('SELECT COUNT(*) as count FROM user_activity WHERE action_type = "login" AND DATE(created_at) = ?', 
+                                           (today,)).fetchone()['count']
+        
+        # Последние активности
+        recent_activities = conn.execute('''
+            SELECT ua.*, u.username, u.full_name 
+            FROM user_activity ua
+            LEFT JOIN users u ON ua.user_id = u.id
+            ORDER BY ua.created_at DESC 
+            LIMIT 10
+        ''').fetchall()
+        
+        # Последние пользователи
+        recent_users = conn.execute('''
+            SELECT * FROM users 
+            ORDER BY created_at DESC 
+            LIMIT 10
+        ''').fetchall()
+        
+        # Статистика по модулям
+        module_stats = conn.execute('''
+            SELECT m.name, COUNT(ua.id) as activity_count
+            FROM modules m
+            LEFT JOIN user_activity ua ON m.code = ua.module
+            GROUP BY m.id, m.name
+            ORDER BY activity_count DESC
+            LIMIT 10
+        ''').fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении статистики для админ-панели: {e}")
+        recent_activities = []
+        recent_users = []
+        module_stats = []
+    finally:
+        conn.close()
+    
+    # Логируем доступ к админ-панели
+    log_activity(user['id'], 'access_admin', 'admin', 'Доступ к панели администратора')
+    
+    return render_template('admin_dashboard.html', 
+                         user=user, 
+                         stats=stats,
+                         recent_activities=recent_activities,
+                         recent_users=recent_users,
+                         module_stats=module_stats)
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """Управление пользователями"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем параметры фильтрации и сортировки
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search = request.args.get('search', '')
+    role = request.args.get('role', '')
+    status = request.args.get('status', '')
+    sort_by = request.args.get('sort_by', 'created_at')
+    sort_order = request.args.get('sort_order', 'desc')
+    
+    # Строим запрос
+    conn = get_db_connection()
+    try:
+        query = 'SELECT * FROM users WHERE 1=1'
+        params = []
+        
+        if search:
+            query += ' AND (username LIKE ? OR email LIKE ? OR full_name LIKE ? OR phone LIKE ?)'
+            search_term = f'%{search}%'
+            params.extend([search_term, search_term, search_term, search_term])
+        
+        if role:
+            query += ' AND role = ?'
+            params.append(role)
+        
+        if status:
+            query += ' AND status = ?'
+            params.append(status)
+        
+        # Добавляем сортировку
+        if sort_by in ['username', 'email', 'full_name', 'role', 'status', 'created_at', 'last_login']:
+            query += f' ORDER BY {sort_by} {sort_order}'
+        else:
+            query += ' ORDER BY created_at DESC'
+        
+        # Получаем общее количество записей
+        count_query = query.replace('SELECT *', 'SELECT COUNT(*) as count', 1)
+        total_count = conn.execute(count_query, params).fetchone()['count']
+        
+        # Добавляем пагинацию
+        query += ' LIMIT ? OFFSET ?'
+        params.extend([per_page, (page - 1) * per_page])
+        
+        users = conn.execute(query, params).fetchall()
+        
+        # Получаем статистику по ролям
+        role_stats = conn.execute('''
+            SELECT role, COUNT(*) as count 
+            FROM users 
+            GROUP BY role 
+            ORDER BY count DESC
+        ''').fetchall()
+        
+        # Получаем статистику по статусам
+        status_stats = conn.execute('''
+            SELECT status, COUNT(*) as count 
+            FROM users 
+            GROUP BY status 
+            ORDER BY count DESC
+        ''').fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении пользователей: {e}")
+        users = []
+        role_stats = []
+        status_stats = []
+        total_count = 0
+    finally:
+        conn.close()
+    
+    # Логируем просмотр пользователей
+    log_activity(user['id'], 'view_users', 'admin', 'Просмотр списка пользователей')
+    
+    return render_template('admin_users.html', 
+                         user=user, 
+                         users=users,
+                         role_stats=role_stats,
+                         status_stats=status_stats,
+                         page=page,
+                         per_page=per_page,
+                         total_count=total_count,
+                         filters={
+                             'search': search,
+                             'role': role,
+                             'status': status,
+                             'sort_by': sort_by,
+                             'sort_order': sort_order
+                         })
+
+@app.route('/admin/user/<int:user_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_user_detail(user_id):
+    """Детальная информация о пользователе"""
+    admin_user = get_user_by_id(session['user_id'])
+    
+    if not admin_user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_user':
+            # Получаем данные из формы
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            full_name = request.form.get('full_name', '').strip()
+            phone = request.form.get('phone', '').strip()
+            company = request.form.get('company', '').strip()
+            position = request.form.get('position', '').strip()
+            role = request.form.get('role', 'user')
+            status = request.form.get('status', 'active')
+            theme = request.form.get('theme', 'light')
+            language = request.form.get('language', 'ru')
             
-            if block_type == "permanent":
-                # Перманентная блокировка
-                await db.execute(
-                    "UPDATE users SET is_blocked = 1, frozen_until = NULL, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
-                    (user_id,)
-                )
-                # Логируем блокировку
-                await log_action(user[0], "user_block", f"Заблокирован пользователь: {target_user[0]}")
+            try:
+                # Получаем старые значения для аудита
+                old_user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+                
+                # Обновляем пользователя
+                conn.execute('''
+                    UPDATE users 
+                    SET username = ?, email = ?, full_name = ?, phone = ?, company = ?, 
+                        position = ?, role = ?, status = ?, theme = ?, language = ?
+                    WHERE id = ?
+                ''', (username, email, full_name, phone, company, position, role, status, theme, language, user_id))
+                
+                # Аудит изменений
+                new_values = {
+                    'username': username,
+                    'email': email,
+                    'full_name': full_name,
+                    'phone': phone,
+                    'company': company,
+                    'position': position,
+                    'role': role,
+                    'status': status,
+                    'theme': theme,
+                    'language': language
+                }
+                
+                audit_log(admin_user['id'], 'update_user', 'user', user_id, dict(old_user), new_values)
+                
+                conn.commit()
+                flash('Пользователь успешно обновлен', 'success')
+                
+            except Exception as e:
+                print(f"Ошибка при обновлении пользователя: {e}")
+                flash('Произошла ошибка при обновлении пользователя', 'error')
+        
+        elif action == 'delete_user':
+            try:
+                # Нельзя удалить себя
+                if user_id == admin_user['id']:
+                    flash('Вы не можете удалить свой собственный аккаунт', 'error')
+                else:
+                    # Удаляем пользователя
+                    conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                    conn.commit()
+                    
+                    # Аудит удаления
+                    audit_log(admin_user['id'], 'delete_user', 'user', user_id)
+                    
+                    flash('Пользователь успешно удален', 'success')
+                    return redirect(url_for('admin_users'))
+                    
+            except Exception as e:
+                print(f"Ошибка при удалении пользователя: {e}")
+                flash('Произошла ошибка при удалении пользователя', 'error')
+        
+        elif action == 'reset_password':
+            new_password = secrets.token_hex(8)  # Генерируем случайный пароль
+            password_hash = hash_password(new_password)
+            
+            try:
+                conn.execute('UPDATE users SET password_hash = ? WHERE id = ?', 
+                            (password_hash, user_id))
+                conn.commit()
+                
+                # Аудит сброса пароля
+                audit_log(admin_user['id'], 'reset_password', 'user', user_id)
+                
+                flash(f'Пароль сброшен. Новый пароль: {new_password}', 'success')
+                
+            except Exception as e:
+                print(f"Ошибка при сбросе пароля: {e}")
+                flash('Произошла ошибка при сбросе пароля', 'error')
+    
+    # Получаем информацию о пользователе
+    try:
+        user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+        
+        if not user:
+            flash('Пользователь не найден', 'error')
+            return redirect(url_for('admin_users'))
+        
+        # Получаем активность пользователя
+        activities = conn.execute('''
+            SELECT * FROM user_activity 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 20
+        ''', (user_id,)).fetchall()
+        
+        # Получаем модули пользователя
+        user_modules = get_user_modules(user_id)
+        
+        # Получаем статистику пользователя
+        stats = {
+            'total_activities': conn.execute('SELECT COUNT(*) as count FROM user_activity WHERE user_id = ?', 
+                                           (user_id,)).fetchone()['count'],
+            'total_logins': conn.execute('SELECT COUNT(*) as count FROM user_activity WHERE user_id = ? AND action_type = "login"', 
+                                       (user_id,)).fetchone()['count'],
+            'documents_count': conn.execute('SELECT COUNT(*) as count FROM documents WHERE user_id = ?', 
+                                          (user_id,)).fetchone()['count']
+        }
+        
+    except Exception as e:
+        print(f"Ошибка при получении информации о пользователе: {e}")
+        flash('Произошла ошибка при получении информации о пользователе', 'error')
+        return redirect(url_for('admin_users'))
+    finally:
+        conn.close()
+    
+    # Логируем просмотр пользователя
+    log_activity(admin_user['id'], 'view_user_detail', 'admin', f'Просмотр пользователя {user["username"]}')
+    
+    return render_template('admin_user_detail.html', 
+                         admin_user=admin_user, 
+                         user=dict(user),
+                         activities=activities,
+                         user_modules=user_modules,
+                         stats=stats)
+
+@app.route('/admin/modules')
+@admin_required
+def admin_modules():
+    """Управление модулями"""
+    user = get_user_by_id(session['user_id'])
+    
+    if not user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем все модули
+    conn = get_db_connection()
+    try:
+        modules = conn.execute('''
+            SELECT m.*, COUNT(DISTINCT uma.user_id) as user_count
+            FROM modules m
+            LEFT JOIN user_module_access uma ON m.id = uma.module_id
+            GROUP BY m.id
+            ORDER BY m.name
+        ''').fetchall()
+        
+        # Получаем категории модулей
+        categories = conn.execute('SELECT * FROM module_categories WHERE is_active = 1 ORDER BY sort_order').fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении модулей: {e}")
+        modules = []
+        categories = []
+    finally:
+        conn.close()
+    
+    # Логируем просмотр модулей
+    log_activity(user['id'], 'view_modules_admin', 'admin', 'Просмотр управления модулями')
+    
+    return render_template('admin_modules.html', user=user, modules=modules, categories=categories)
+
+@app.route('/admin/module/<int:module_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_module_detail(module_id):
+    """Редактирование модуля"""
+    admin_user = get_user_by_id(session['user_id'])
+    
+    if not admin_user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_module':
+            # Получаем данные из формы
+            name = request.form.get('name', '').strip()
+            code = request.form.get('code', '').strip()
+            description = request.form.get('description', '').strip()
+            icon = request.form.get('icon', '').strip()
+            category = request.form.get('category', '').strip()
+            version = request.form.get('version', '1.0.0').strip()
+            author = request.form.get('author', '').strip()
+            enabled = request.form.get('enabled') == 'on'
+            
+            try:
+                # Получаем старые значения для аудита
+                old_module = conn.execute('SELECT * FROM modules WHERE id = ?', (module_id,)).fetchone()
+                
+                # Обновляем модуль
+                conn.execute('''
+                    UPDATE modules 
+                    SET name = ?, code = ?, description = ?, icon = ?, category = ?, 
+                        version = ?, author = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (name, code, description, icon, category, version, author, enabled, module_id))
+                
+                # Аудит изменений
+                new_values = {
+                    'name': name,
+                    'code': code,
+                    'description': description,
+                    'icon': icon,
+                    'category': category,
+                    'version': version,
+                    'author': author,
+                    'enabled': enabled
+                }
+                
+                audit_log(admin_user['id'], 'update_module', 'module', module_id, dict(old_module), new_values)
+                
+                conn.commit()
+                flash('Модуль успешно обновлен', 'success')
+                
+            except Exception as e:
+                print(f"Ошибка при обновлении модуля: {e}")
+                flash('Произошла ошибка при обновлении модуля', 'error')
+        
+        elif action == 'delete_module':
+            try:
+                # Удаляем модуль
+                conn.execute('DELETE FROM modules WHERE id = ?', (module_id,))
+                conn.commit()
+                
+                # Аудит удаления
+                audit_log(admin_user['id'], 'delete_module', 'module', module_id)
+                
+                flash('Модуль успешно удален', 'success')
+                return redirect(url_for('admin_modules'))
+                
+            except Exception as e:
+                print(f"Ошибка при удалении модуля: {e}")
+                flash('Произошла ошибка при удалении модуля', 'error')
+    
+    # Получаем информацию о модуле
+    try:
+        module = conn.execute('SELECT * FROM modules WHERE id = ?', (module_id,)).fetchone()
+        
+        if not module:
+            flash('Модуль не найден', 'error')
+            return redirect(url_for('admin_modules'))
+        
+        # Получаем разрешения модуля
+        permissions = conn.execute('SELECT * FROM module_permissions WHERE module_id = ?', (module_id,)).fetchall()
+        
+        # Получаем пользователей с доступом к модулю
+        users_with_access = conn.execute('''
+            SELECT u.*, uma.access_level, uma.granted_at
+            FROM users u
+            JOIN user_module_access uma ON u.id = uma.user_id
+            WHERE uma.module_id = ?
+            ORDER BY u.username
+        ''', (module_id,)).fetchall()
+        
+        # Получаем все пользователи для выпадающего списка
+        all_users = conn.execute('SELECT id, username, full_name FROM users ORDER BY username').fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении информации о модуле: {e}")
+        flash('Произошла ошибка при получении информации о модуле', 'error')
+        return redirect(url_for('admin_modules'))
+    finally:
+        conn.close()
+    
+    # Логируем просмотр модуля
+    log_activity(admin_user['id'], 'view_module_detail', 'admin', f'Просмотр модуля {module["name"]}')
+    
+    return render_template('admin_module_detail.html', 
+                         admin_user=admin_user, 
+                         module=dict(module),
+                         permissions=permissions,
+                         users_with_access=users_with_access,
+                         all_users=all_users)
+
+@app.route('/admin/activity')
+@admin_required
+def admin_activity():
+    """Просмотр активности всех пользователей"""
+    admin_user = get_user_by_id(session['user_id'])
+    
+    if not admin_user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    # Получаем параметры фильтрации
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    user_id = request.args.get('user_id', type=int)
+    module = request.args.get('module', '')
+    action_type = request.args.get('action_type', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Строим запрос
+    conn = get_db_connection()
+    try:
+        query = '''
+            SELECT ua.*, u.username, u.full_name 
+            FROM user_activity ua
+            LEFT JOIN users u ON ua.user_id = u.id
+            WHERE 1=1
+        '''
+        params = []
+        
+        if user_id:
+            query += ' AND ua.user_id = ?'
+            params.append(user_id)
+        
+        if module:
+            query += ' AND ua.module = ?'
+            params.append(module)
+        
+        if action_type:
+            query += ' AND ua.action_type = ?'
+            params.append(action_type)
+        
+        if date_from:
+            query += ' AND DATE(ua.created_at) >= ?'
+            params.append(date_from)
+        
+        if date_to:
+            query += ' AND DATE(ua.created_at) <= ?'
+            params.append(date_to)
+        
+        query += ' ORDER BY ua.created_at DESC'
+        
+        # Получаем общее количество записей
+        count_query = query.replace('SELECT ua.*, u.username, u.full_name', 'SELECT COUNT(*) as count', 1)
+        total_count = conn.execute(count_query, params).fetchone()['count']
+        
+        # Добавляем пагинацию
+        query += ' LIMIT ? OFFSET ?'
+        params.extend([per_page, (page - 1) * per_page])
+        
+        activities = conn.execute(query, params).fetchall()
+        
+        # Получаем уникальные модули для фильтра
+        modules = conn.execute('SELECT DISTINCT module FROM user_activity WHERE module IS NOT NULL ORDER BY module').fetchall()
+        
+        # Получаем уникальные действия для фильтра
+        action_types = conn.execute('SELECT DISTINCT action_type FROM user_activity WHERE action_type IS NOT NULL ORDER BY action_type').fetchall()
+        
+        # Получаем пользователей для фильтра
+        users = conn.execute('SELECT id, username, full_name FROM users ORDER BY username').fetchall()
+        
+    except Exception as e:
+        print(f"Ошибка при получении активности: {e}")
+        activities = []
+        modules = []
+        action_types = []
+        users = []
+        total_count = 0
+    finally:
+        conn.close()
+    
+    # Логируем просмотр активности
+    log_activity(admin_user['id'], 'view_activity_admin', 'admin', 'Просмотр активности системы')
+    
+    return render_template('admin_activity.html', 
+                         admin_user=admin_user, 
+                         activities=activities,
+                         modules=modules,
+                         action_types=action_types,
+                         users=users,
+                         page=page,
+                         per_page=per_page,
+                         total_count=total_count,
+                         filters={
+                             'user_id': user_id,
+                             'module': module,
+                             'action_type': action_type,
+                             'date_from': date_from,
+                             'date_to': date_to
+                         })
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    """Настройки системы"""
+    admin_user = get_user_by_id(session['user_id'])
+    
+    if not admin_user:
+        session.clear()
+        flash('Пользователь не найден', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_settings':
+            # Обновляем настройки из формы
+            for key in request.form:
+                if key.startswith('setting_'):
+                    setting_key = key.replace('setting_', '')
+                    setting_value = request.form.get(key)
+                    update_system_setting(setting_key, setting_value)
+            
+            # Аудит изменений настроек
+            audit_log(admin_user['id'], 'update_settings', 'system', None, None, {'settings_updated': True})
+            
+            flash('Настройки успешно обновлены', 'success')
+        
+        elif action == 'add_category':
+            # Добавляем новую категорию модулей
+            name = request.form.get('category_name', '').strip()
+            code = request.form.get('category_code', '').strip()
+            description = request.form.get('category_description', '').strip()
+            icon = request.form.get('category_icon', '').strip()
+            color = request.form.get('category_color', '#6C63FF').strip()
+            sort_order = request.form.get('category_sort_order', 0, type=int)
+            
+            if name and code:
+                conn = get_db_connection()
+                try:
+                    conn.execute('''
+                        INSERT INTO module_categories (name, code, description, icon, color, sort_order)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (name, code, description, icon, color, sort_order))
+                    conn.commit()
+                    
+                    # Аудит добавления категории
+                    audit_log(admin_user['id'], 'add_category', 'system', None, None, {
+                        'name': name,
+                        'code': code,
+                        'description': description
+                    })
+                    
+                    flash('Категория успешно добавлена', 'success')
+                except Exception as e:
+                    print(f"Ошибка при добавлении категории: {e}")
+                    flash('Произошла ошибка при добавлении категории', 'error')
+                finally:
+                    conn.close()
             else:
-                # Временная блокировка (заморозка)
-                duration = int(block_duration)
-                if block_unit == "hours":
-                    freeze_until = datetime.now() + timedelta(hours=duration)
-                elif block_unit == "days":
-                    freeze_until = datetime.now() + timedelta(days=duration)
-                else:  # weeks
-                    freeze_until = datetime.now() + timedelta(weeks=duration)
-                
-                await db.execute(
-                    "UPDATE users SET is_blocked = 0, frozen_until = ?, block_count = block_count + 1 WHERE id = ? AND role != 'admin'",
-                    (freeze_until.isoformat(), user_id)
-                )
-                # Логируем заморозку
-                await log_action(user[0], "user_freeze", f"Заморожен пользователь: {target_user[0]} до {freeze_until.strftime('%d.%m.%Y %H:%M')}")
-            
-            await db.commit()
-    except Exception as e:
-        logger.error(f"Ошибка при блокировке пользователя: {e}")
+                flash('Заполните название и код категории', 'error')
     
-    return RedirectResponse(url="/dashboard/users", status_code=303)
-
-# --- РАЗБЛОКИРОВКА ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/dashboard/users/unblock/{user_id}")
-async def unblock_user(request: Request, user_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
+    # Получаем все настройки системы
+    conn = get_db_connection()
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-            target_user = await cursor.fetchone()
-            
-            await db.execute(
-                "UPDATE users SET is_blocked = 0, frozen_until = NULL WHERE id = ?",
-                (user_id,)
-            )
-            await db.commit()
-            
-            # Логируем разблокировку
-            await log_action(user[0], "user_unblock", f"Разблокирован пользователь: {target_user[0]}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при разблокировке пользователя: {e}")
-    
-    return RedirectResponse(url="/dashboard/users", status_code=303)
-
-# --- УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/dashboard/users/delete/{user_id}")
-async def delete_user(request: Request, user_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # Нельзя удалить администратора
-            cursor = await db.execute("SELECT role, username FROM users WHERE id = ?", (user_id,))
-            user_role = await cursor.fetchone()
-            
-            if user_role and user_role[0] != "admin":
-                await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-                await db.commit()
-                
-                # Логируем удаление пользователя
-                await log_action(user[0], "user_delete", f"Удален пользователь: {user_role[1]}")
-                
-    except Exception as e:
-        logger.error(f"Ошибка при удалении пользователя: {e}")
-    
-    return RedirectResponse(url="/dashboard/users", status_code=303)
-
-# --- БЛОКИРОВКА IP ---
-@app.post("/dashboard/ip/block")
-async def block_ip(
-    request: Request,
-    ip_address: str = Form(...),
-    reason: str = Form(""),
-    block_type: str = Form(...),
-    block_duration: str = Form("1"),
-    block_unit: str = Form("hours")
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        # Валидация IP-адреса
-        ipaddress.ip_address(ip_address)
+        settings = conn.execute('SELECT * FROM system_settings ORDER BY category, setting_key').fetchall()
         
-        async with aiosqlite.connect(DB_PATH) as db:
-            if block_type == "permanent":
-                await db.execute(
-                    "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, NULL, ?)",
-                    (ip_address, reason, datetime.now().isoformat())
-                )
-                # Логируем блокировку IP
-                await log_action(user[0], "ip_block", f"Заблокирован IP: {ip_address} (постоянно)")
-            else:
-                duration = int(block_duration)
-                if block_unit == "hours":
-                    blocked_until = datetime.now() + timedelta(hours=duration)
-                elif block_unit == "days":
-                    blocked_until = datetime.now() + timedelta(days=duration)
-                else:  # weeks
-                    blocked_until = datetime.now() + timedelta(weeks=duration)
-                
-                await db.execute(
-                    "INSERT OR REPLACE INTO blocked_ips (ip_address, reason, blocked_until, created_at) VALUES (?, ?, ?, ?)",
-                    (ip_address, reason, blocked_until.isoformat(), datetime.now().isoformat())
-                )
-                # Логируем блокировку IP
-                await log_action(user[0], "ip_block", f"Заблокирован IP: {ip_address} до {blocked_until.strftime('%d.%m.%Y %H:%M')}")
-            
-            await db.commit()
-    except ValueError:
-        return RedirectResponse(url="/dashboard/ip?error=invalid_ip", status_code=303)
-    except Exception as e:
-        logger.error(f"Ошибка при блокировке IP: {e}")
-    
-    return RedirectResponse(url="/dashboard/ip", status_code=303)
-
-# --- РАЗБЛОКИРОВКА IP ---
-@app.get("/dashboard/ip/unblock/{ip_address}")
-async def unblock_ip(request: Request, ip_address: str):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("DELETE FROM blocked_ips WHERE ip_address = ?", (ip_address,))
-            await db.commit()
-            
-            # Логируем разблокировку IP
-            await log_action(user[0], "ip_unblock", f"Разблокирован IP: {ip_address}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при разблокировке IP: {e}")
-    
-    return RedirectResponse(url="/dashboard/ip", status_code=303)
-
-# --- УПРАВЛЕНИЕ IP (админ) ---
-@app.get("/dashboard/ip", response_class=HTMLResponse)
-async def ip_management(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM blocked_ips ORDER BY created_at DESC")
-            ip_list = await cursor.fetchall()
+        # Группируем настройки по категориям
+        settings_by_category = {}
+        for setting in settings:
+            category = setting['category'] or 'other'
+            if category not in settings_by_category:
+                settings_by_category[category] = []
+            settings_by_category[category].append(dict(setting))
         
-        return templates.TemplateResponse("ip_management.html", {
-            "request": request,
-            "active": "ip",
-            "ip_list": ip_list,
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке IP: {e}")
-        return templates.TemplateResponse("ip_management.html", {
-            "request": request,
-            "active": "ip",
-            "ip_list": [],
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
-
-# --- СИСТЕМНЫЕ НАСТРОЙКИ (админ) ---
-@app.get("/dashboard/system", response_class=HTMLResponse)
-async def system_settings(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("SELECT * FROM system_settings ORDER BY setting_key")
-            settings_list = await cursor.fetchall()
+        # Получаем категории модулей
+        categories = conn.execute('SELECT * FROM module_categories ORDER BY sort_order').fetchall()
         
-        return templates.TemplateResponse("system_settings.html", {
-            "request": request,
-            "active": "system",
-            "settings_list": settings_list,
-            "user": user
-        })
     except Exception as e:
-        logger.error(f"Ошибка при загрузке системных настроек: {e}")
-        return templates.TemplateResponse("system_settings.html", {
-            "request": request,
-            "active": "system",
-            "settings_list": [],
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
+        print(f"Ошибка при получении настроек: {e}")
+        settings_by_category = {}
+        categories = []
+    finally:
+        conn.close()
+    
+    # Логируем просмотр настроек
+    log_activity(admin_user['id'], 'view_settings_admin', 'admin', 'Просмотр настроек системы')
+    
+    return render_template('admin_settings.html', 
+                         admin_user=admin_user, 
+                         settings_by_category=settings_by_category,
+                         categories=categories)
 
-# --- ОБНОВЛЕНИЕ СИСТЕМНЫХ НАСТРОЕК ---
-@app.post("/dashboard/system/update")
-async def update_system_settings(
-    request: Request,
-    setting_key: str = Form(...),
-    setting_value: str = Form(...)
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE system_settings SET setting_value = ?, updated_at = ? WHERE setting_key = ?",
-                (setting_value, datetime.now().isoformat(), setting_key)
-            )
-            await db.commit()
-            
-            # Логируем изменение настроек
-            await log_action(user[0], "system_settings_update", f"Обновлена настройка: {setting_key} = {setting_value}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при обновлении системных настроек: {e}")
-    
-    return RedirectResponse(url="/dashboard/system", status_code=303)
+# ==================== API МАРШРУТЫ ====================
 
-# --- ЛОГИ СИСТЕМЫ (админ) ---
-@app.get("/dashboard/logs", response_class=HTMLResponse)
-async def system_logs(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/api/v1/user/profile', methods=['GET'])
+@api_key_required
+def api_user_profile():
+    """API для получения профиля пользователя"""
+    user = request.user
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("""
-                SELECT al.*, u.username 
-                FROM action_logs al 
-                LEFT JOIN users u ON al.user_id = u.id 
-                ORDER BY al.created_at DESC 
-                LIMIT 100
-            """)
-            logs_list = await cursor.fetchall()
-        
-        return templates.TemplateResponse("system_logs.html", {
-            "request": request,
-            "active": "logs",
-            "logs_list": logs_list,
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке логов: {e}")
-        return templates.TemplateResponse("system_logs.html", {
-            "request": request,
-            "active": "logs",
-            "logs_list": [],
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
-
-# --- СТАТИСТИКА СИСТЕМЫ (админ) ---
-@app.get("/dashboard/stats", response_class=HTMLResponse)
-async def stats(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # Общая статистика
-            cursor = await db.execute("SELECT COUNT(*) FROM users")
-            total_users = await cursor.fetchone()
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM qr_codes")
-            total_qr = await cursor.fetchone()
-            
-            cursor = await db.execute("SELECT SUM(scan_count) FROM qr_codes")
-            total_scans = await cursor.fetchone()
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM blocked_ips")
-            total_blocked_ips = await cursor.fetchone()
-            
-            # Статистика по ролям
-            cursor = await db.execute("SELECT role, COUNT(*) FROM users GROUP BY role")
-            roles_stats = await cursor.fetchall()
-            
-            # Последние QR-коды
-            cursor = await db.execute("""
-                SELECT qr.id, qr.title, qr.scan_count, qr.created_at, u.username 
-                FROM qr_codes qr 
-                LEFT JOIN users u ON qr.user_id = u.id 
-                ORDER BY qr.created_at DESC 
-                LIMIT 10
-            """)
-            recent_qr = await cursor.fetchall()
-            
-            # Статистика по сканированиям
-            cursor = await db.execute("""
-                SELECT DATE(created_at) as date, COUNT(*) as count 
-                FROM qr_codes 
-                WHERE created_at >= date('now', '-30 days') 
-                GROUP BY DATE(created_at) 
-                ORDER BY date DESC
-            """)
-            scans_stats = await cursor.fetchall()
-        
-        return templates.TemplateResponse("stats.html", {
-            "request": request,
-            "active": "stats",
-            "total_users": total_users[0],
-            "total_qr": total_qr[0],
-            "total_scans": total_scans[0] or 0,
-            "total_blocked_ips": total_blocked_ips[0],
-            "roles_stats": roles_stats,
-            "recent_qr": recent_qr,
-            "scans_stats": scans_stats,
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке статистики: {e}")
-        return templates.TemplateResponse("stats.html", {
-            "request": request,
-            "active": "stats",
-            "total_users": 0,
-            "total_qr": 0,
-            "total_scans": 0,
-            "total_blocked_ips": 0,
-            "roles_stats": [],
-            "recent_qr": [],
-            "scans_stats": [],
-            "user": user,
-            "error": "Ошибка при загрузке статистики"
-        })
-
-# --- ЖАЛОБЫ: ФОРМА ОТПРАВКИ ---
-@app.get("/user/energy/complaints/new", response_class=HTMLResponse)
-async def new_complaint_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("complaint_form.html", {
-        "request": request,
-        "user": user
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': user['id'],
+            'username': user['username'],
+            'email': user['email'],
+            'full_name': user['full_name'],
+            'phone': user['phone'],
+            'company': user['company'],
+            'position': user['position'],
+            'role': user['role'],
+            'status': user['status'],
+            'theme': user['theme'],
+            'language': user['language'],
+            'created_at': user['created_at'],
+            'last_login': user['last_login']
+        }
     })
 
-@app.post("/user/energy/complaints/new")
-async def submit_complaint(
-    request: Request,
-    subject: str = Form(...),
-    message: str = Form(...)
-):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/api/v1/user/modules', methods=['GET'])
+@api_key_required
+def api_user_modules():
+    """API для получения модулей пользователя"""
+    user = request.user
+    modules = get_user_modules(user['id'])
+    
+    # Форматируем модули для API
+    formatted_modules = []
+    for module in modules:
+        formatted_modules.append({
+            'id': module['id'],
+            'name': module['name'],
+            'code': module['code'],
+            'description': module['description'],
+            'icon': module['icon'],
+            'category': module['category'],
+            'version': module['version'],
+            'access_level': module.get('access_level', 'view')
+        })
+    
+    return jsonify({
+        'success': True,
+        'data': formatted_modules
+    })
+
+@app.route('/api/v1/system/stats', methods=['GET'])
+@api_key_required
+def api_system_stats():
+    """API для получения статистики системы"""
+    conn = get_db_connection()
     
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "INSERT INTO complaints (user_id, user_name, subject, message, created_at) VALUES (?, ?, ?, ?, ?)",
-                (user[0], user[1], subject, message, datetime.now().isoformat())
-            )
-            await db.commit()
-            
-            # Логируем отправку жалобы
-            await log_action(user[0], "complaint_submitted", f"Подана жалоба: {subject}")
-            
-        return templates.TemplateResponse("complaint_success.html", {
-            "request": request,
-            "user": user,
-            "message": "Ваша жалоба успешно отправлена администратору"
+        # Получаем статистику
+        stats = {
+            'total_users': conn.execute('SELECT COUNT(*) as count FROM users').fetchone()['count'],
+            'active_users': conn.execute('SELECT COUNT(*) as count FROM users WHERE status = "active"').fetchone()['count'],
+            'total_modules': conn.execute('SELECT COUNT(*) as count FROM modules').fetchone()['count'],
+            'active_modules': conn.execute('SELECT COUNT(*) as count FROM modules WHERE enabled = 1').fetchone()['count'],
+            'total_activities': conn.execute('SELECT COUNT(*) as count FROM user_activity').fetchone()['count'],
+            'storage_used': conn.execute('SELECT COALESCE(SUM(file_size), 0) as total FROM documents').fetchone()['total']
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': stats
         })
         
     except Exception as e:
-        logger.error(f"Ошибка при отправке жалобы: {e}")
-        return templates.TemplateResponse("complaint_form.html", {
-            "request": request,
-            "user": user,
-            "error": "Ошибка при отправке жалобы"
-        })
+        print(f"Ошибка при получении статистики: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Ошибка при получении статистики'
+        }), 500
+    finally:
+        conn.close()
 
-# --- ЖАЛОБЫ: ПРОСМОТР СТАТУСА ---
-@app.get("/user/energy/complaints/status", response_class=HTMLResponse)
-async def complaint_status(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.route('/api/v1/auth/login', methods=['POST'])
+def api_auth_login():
+    """API для аутентификации"""
+    data = request.get_json()
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                "SELECT * FROM complaints WHERE user_id = ? ORDER BY created_at DESC",
-                (user[0],)
-            )
-            complaints = await cursor.fetchall()
-        
-        return templates.TemplateResponse("complaint_status.html", {
-            "request": request,
-            "user": user,
-            "complaints": complaints
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке жалоб: {e}")
-        return templates.TemplateResponse("complaint_status.html", {
-            "request": request,
-            "user": user,
-            "complaints": [],
-            "error": "Ошибка при загрузке данных"
-        })
+    if not data:
+        return jsonify({'success': False, 'error': 'Неверный формат данных'}), 400
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Не указаны имя пользователя или пароль'}), 400
+    
+    # Ищем пользователя
+    user = get_user_by_username(username)
+    if not user:
+        user = get_user_by_email(username)
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'Неверное имя пользователя или пароль'}), 401
+    
+    if user['status'] != 'active':
+        return jsonify({'success': False, 'error': 'Аккаунт заблокирован'}), 403
+    
+    if not verify_password(password, user['password_hash']):
+        return jsonify({'success': False, 'error': 'Неверное имя пользователя или пароль'}), 401
+    
+    # Логируем успешный вход через API
+    log_activity(user['id'], 'api_login', 'auth', 'Успешный вход через API')
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'full_name': user['full_name'],
+                'role': user['role']
+            },
+            'api_key': user['api_key'],
+            'token': secrets.token_hex(32)  # Временный токен для сессии API
+        }
+    })
 
-# --- ЖАЛОБЫ: АДМИН ПАНЕЛЬ ---
-@app.get("/dashboard/energy/complaints/admin", response_class=HTMLResponse)
-async def admin_complaints(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute("""
-                SELECT c.*, u.username 
-                FROM complaints c 
-                LEFT JOIN users u ON c.user_id = u.id 
-                ORDER BY c.status ASC, c.created_at DESC
-            """)
-            complaints = await cursor.fetchall()
-        
-        return templates.TemplateResponse("admin_complaints.html", {
-            "request": request,
-            "user": user,
-            "complaints": complaints,
-            "active": "complaints"
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке жалоб: {e}")
-        return templates.TemplateResponse("admin_complaints.html", {
-            "request": request,
-            "user": user,
-            "complaints": [],
-            "error": "Ошибка при загрузке данных",
-            "active": "complaints"
-        })
+# ==================== УТИЛИТЫ ====================
 
-# --- ЖАЛОБЫ: ОБНОВЛЕНИЕ СТАТУСА АДМИНОМ ---
-@app.post("/dashboard/energy/complaints/{complaint_id}/update")
-async def update_complaint_status(
-    request: Request,
-    complaint_id: int,
-    status: str = Form(...),
-    admin_response: str = Form(None)
-):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE complaints SET status = ?, admin_response = ?, updated_at = ? WHERE id = ?",
-                (status, admin_response, datetime.now().isoformat(), complaint_id)
-            )
-            await db.commit()
+@app.context_processor
+def inject_user():
+    """Добавляем пользователя во все шаблоны"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        if user:
+            return {'current_user': user}
+    return {'current_user': None}
+
+@app.context_processor
+def inject_settings():
+    """Добавляем настройки системы во все шаблоны"""
+    return {
+        'site_name': get_system_setting('site_name', 'IDQR Система'),
+        'site_description': get_system_setting('site_description', 'Комплексная система управления'),
+        'registration_enabled': get_system_setting('registration_enabled', 'true') == 'true'
+    }
+
+@app.before_request
+def before_request():
+    """Обработка перед каждым запросом"""
+    # Проверяем режим обслуживания
+    if get_system_setting('maintenance_mode', 'false') == 'true':
+        # Разрешаем доступ только администраторам
+        if request.endpoint and request.endpoint not in ['login', 'static']:
+            if 'user_id' not in session:
+                return render_template('maintenance.html'), 503
             
-            # Логируем обновление жалобы
-            await log_action(user[0], "complaint_updated", f"Обновлена жалоба #{complaint_id}, статус: {status}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при обновлении жалобы: {e}")
+            user = get_user_by_id(session['user_id'])
+            if not user or user['role'] != 'admin':
+                return render_template('maintenance.html'), 503
     
-    return RedirectResponse(url="/dashboard/energy/complaints/admin", status_code=303)
+    # Обновляем время последней активности для авторизованных пользователей
+    if 'user_id' in session:
+        conn = get_db_connection()
+        try:
+            conn.execute('UPDATE users SET last_activity = CURRENT_TIMESTAMP WHERE id = ?', 
+                        (session['user_id'],))
+            conn.commit()
+        except Exception as e:
+            print(f"Ошибка при обновлении активности: {e}")
+        finally:
+            conn.close()
 
-# --- ЖАЛОБЫ: УДАЛЕНИЕ АДМИНОМ ---
-@app.get("/dashboard/energy/complaints/{complaint_id}/delete")
-async def delete_complaint(request: Request, complaint_id: int):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+# ==================== ОБРАБОТЧИКИ ОШИБОК ====================
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """Обработка ошибки 404"""
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Ресурс не найден'}), 404
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
-            await db.commit()
-            
-            # Логируем удаление жалобы
-            await log_action(user[0], "complaint_deleted", f"Удалена жалоба #{complaint_id}")
-            
-    except Exception as e:
-        logger.error(f"Ошибка при удалении жалобы: {e}")
+    user = get_user_by_id(session['user_id']) if 'user_id' in session else None
+    return render_template('404.html', user=user), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    """Обработка ошибки 500"""
+    # Логируем ошибку
+    user_id = session.get('user_id')
+    log_error(user_id, 'internal_server_error', str(e), str(traceback.format_exc()))
     
-    return RedirectResponse(url="/dashboard/energy/complaints/admin", status_code=303)
-
-# --- ПАНЕЛЬ ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/user/dashboard", response_class=HTMLResponse)
-async def user_dashboard(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Внутренняя ошибка сервера'}), 500
     
-    return templates.TemplateResponse("user_dashboard.html", {
-        "request": request,
-        "user": user,
-        "active": "dashboard"
-    })
+    user = get_user_by_id(user_id) if user_id else None
+    return render_template('500.html', user=user), 500
 
-# --- НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ ---
-@app.get("/user/settings", response_class=HTMLResponse)
-async def user_settings(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+@app.errorhandler(403)
+def forbidden(e):
+    """Обработка ошибки 403"""
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': 'Доступ запрещен'}), 403
     
-    return templates.TemplateResponse("user_settings.html", {
-        "request": request,
-        "user": user,
-        "active": "settings"
-    })
+    user = get_user_by_id(session['user_id']) if 'user_id' in session else None
+    return render_template('403.html', user=user), 403
 
-# --- СМЕНА ТЕМЫ ---
-@app.post("/user/settings/theme")
-async def change_theme(request: Request, theme: str = Form(...)):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
+# ==================== ЗАПУСК ПРИЛОЖЕНИЯ ====================
+
+def is_safe_url(target):
+    """Проверка безопасности URL для перенаправления"""
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+if __name__ == '__main__':
+    # Инициализируем базу данных
+    init_db()
     
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET theme = ? WHERE id = ?",
-                (theme, user[0])
-            )
-            await db.commit()
-        
-        # Обновляем данные пользователя в сессии
-        request.session["user_theme"] = theme
-        
-        # Логируем смену темы
-        await log_action(user[0], "theme_change", f"Смена темы на: {theme}")
-        
-    except Exception as e:
-        logger.error(f"Ошибка при смене темы: {e}")
+    print("\n" + "="*60)
+    print("🚀 IDQR СИСТЕМА ЗАПУЩЕНА!")
+    print("="*60)
+    print(f"📍 Главная страница: http://localhost:5000")
+    print(f"🔑 Админ панель: http://localhost:5000/admin")
+    print(f"👤 Тестовый администратор: admin / admin123")
+    print(f"📊 База данных: {app.config['DATABASE']}")
+    print(f"📁 Загрузки: {app.config['UPLOAD_FOLDER']}")
+    print("="*60)
+    print("📋 Доступные модули:")
+    print("  • /user/energy - Энергетика и инфраструктура")
+    print("  • /user/medicine - Медицина и здоровье")
+    print("  • /medicine - Общая страница медицины")
+    print("  • /energy/complaints - Жалобы и обращения")
+    print("  • /modules - Все модули системы")
+    print("  • /user/modules - Модули пользователя")
+    print("="*60)
+    print("⚙️  Режим отладки: ВКЛЮЧЕН")
+    print("="*60 + "\n")
     
-    return RedirectResponse(url="/user/settings", status_code=303)
-
-# --- ЗАГРУЗКА ЛОГОТИПА ---
-@app.post("/user/settings/upload_logo")
-async def upload_logo(request: Request, logo: UploadFile = File(...)):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        # Проверяем тип файла
-        if not logo.content_type.startswith('image/'):
-            return RedirectResponse(url="/user/settings?error=invalid_file", status_code=303)
-        
-        # Генерируем уникальное имя файла
-        file_extension = logo.filename.split('.')[-1]
-        filename = f"{user[0]}_{uuid.uuid4()}.{file_extension}"
-        filepath = os.path.join(LOGOS_FOLDER, filename)
-        
-        # Сохраняем файл
-        with open(filepath, "wb") as buffer:
-            content = await logo.read()
-            buffer.write(content)
-        
-        # Обновляем базу данных
-        logo_url = f"/static/logos/{filename}"
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "UPDATE users SET logo_url = ? WHERE id = ?",
-                (logo_url, user[0])
-            )
-            await db.commit()
-        
-        # Логируем загрузку логотипа
-        await log_action(user[0], "logo_upload", "Загружен новый логотип")
-        
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке логотипа: {e}")
-        return RedirectResponse(url="/user/settings?error=upload_failed", status_code=303)
-    
-    return RedirectResponse(url="/user/settings", status_code=303)
-
-# --- СВЯЗЬ С ПОДДЕРЖКОЙ ---
-@app.get("/user/contact", response_class=HTMLResponse)
-async def user_contact(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("user_contact.html", {
-        "request": request,
-        "user": user,
-        "active": "contact"
-    })
-
-# --- МОДУЛИ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ---
-@app.get("/user/modules", response_class=HTMLResponse)
-async def user_modules(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("user_modules.html", {
-        "request": request,
-        "user": user,
-        "active": "modules"
-    })
-
-# --- ПОДМОДУЛИ ---
-@app.get("/user/business", response_class=HTMLResponse)
-async def user_business(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("business.html", {
-        "request": request,
-        "user": user,
-        "active": "business"
-    })
-
-@app.get("/user/services", response_class=HTMLResponse)
-async def user_services(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("services.html", {
-        "request": request,
-        "user": user,
-        "active": "services"
-    })
-
-@app.get("/user/cleaning", response_class=HTMLResponse)
-async def user_cleaning(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("cleaning.html", {
-        "request": request,
-        "user": user,
-        "active": "cleaning"
-    })
-
-# --- ПОДМОДУЛИ ДЛЯ АДМИНА ---
-@app.get("/dashboard/business", response_class=HTMLResponse)
-async def admin_business(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("business.html", {
-        "request": request,
-        "user": user,
-        "active": "business"
-    })
-
-@app.get("/dashboard/services", response_class=HTMLResponse)
-async def admin_services(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("services.html", {
-        "request": request,
-        "user": user,
-        "active": "services"
-    })
-
-@app.get("/dashboard/cleaning", response_class=HTMLResponse)
-async def admin_cleaning(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("cleaning.html", {
-        "request": request,
-        "user": user,
-        "active": "cleaning"
-    })
-
-# --- МОДУЛЬ ЭНЕРГЕТИКИ И ИНФРАСТРУКТУРЫ ---
-@app.get("/dashboard/energy", response_class=HTMLResponse)
-async def admin_energy(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/electricity", response_class=HTMLResponse)
-async def admin_energy_electricity(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_electricity.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/meters", response_class=HTMLResponse)
-async def admin_energy_meters(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_meters.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/inspections", response_class=HTMLResponse)
-async def admin_energy_inspections(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_inspections.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/heat_gas", response_class=HTMLResponse)
-async def admin_energy_heat_gas(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_heat_gas.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/renewable", response_class=HTMLResponse)
-async def admin_energy_renewable(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_renewable.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/suppliers", response_class=HTMLResponse)
-async def admin_energy_suppliers(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_suppliers.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/consumers", response_class=HTMLResponse)
-async def admin_energy_consumers(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_consumers.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/complaints", response_class=HTMLResponse)
-async def admin_energy_complaints(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_complaints.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/analytics", response_class=HTMLResponse)
-async def admin_energy_analytics(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_analytics.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy/documents", response_class=HTMLResponse)
-async def admin_energy_documents(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_documents.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-# --- ОСТАЛЬНЫЕ МАРШРУТЫ ДЛЯ АДМИНА ---
-@app.get("/dashboard/modules", response_class=HTMLResponse)
-async def modules(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("modules.html", {
-        "request": request, 
-        "active": "modules",
-        "user": user
-    })
-
-@app.get("/dashboard/settings", response_class=HTMLResponse)
-async def settings(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("settings.html", {
-        "request": request, 
-        "active": "settings",
-        "user": user
-    })
-
-# --- СТРАНИЦЫ ОШИБОК ---
-@app.get("/user/blocked", response_class=HTMLResponse)
-async def user_blocked(request: Request):
-    return templates.TemplateResponse("user_blocked.html", {"request": request})
-
-@app.get("/user/frozen", response_class=HTMLResponse)
-async def user_frozen(request: Request):
-    return templates.TemplateResponse("account_frozen.html", {"request": request})
-
-@app.get("/ip/blocked", response_class=HTMLResponse)
-async def ip_blocked(request: Request):
-    return templates.TemplateResponse("ip_blocked.html", {"request": request})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Запускаем приложение
+    app.run(host='0.0.0.0', port=5000, debug=True)
