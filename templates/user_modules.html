@@ -405,7 +405,7 @@
         }
     </style>
 </head>
-<body data-theme="{{ user[10] if user else 'light' }}">
+<body data-theme="light">
     <div class="particles" id="particles"></div>
     
     <div class="theme-container">
@@ -424,10 +424,10 @@
     <div class="navbar">
         <h1><i class="fas fa-puzzle-piece"></i> IDQR: Модули</h1>
         <div class="nav-links">
-            <a href="/user/dashboard"><i class="fas fa-tachometer-alt"></i> Панель</a>
-            <a href="/user/modules" class="active"><i class="fas fa-puzzle-piece"></i> Модули</a>
-            <a href="/user/contact"><i class="fas fa-headset"></i> Связь</a>
-            <a href="/user/settings"><i class="fas fa-cog"></i> Настройки</a>
+            <a href="user_dashboard.html"><i class="fas fa-tachometer-alt"></i> Панель</a>
+            <a href="user_modules.html" class="active"><i class="fas fa-puzzle-piece"></i> Модули</a>
+            <a href="user_contact.html"><i class="fas fa-headset"></i> Связь</a>
+            <a href="user_settings.html"><i class="fas fa-cog"></i> Настройки</a>
         </div>
     </div>
 
@@ -444,22 +444,29 @@
         <div class="category-section">
             <h3 class="category-title"><i class="fas fa-home"></i> Услуги и быт</h3>
             <div class="modules-grid">
-                <a href="/user/services" class="module-button"><i class="fas fa-tools"></i> Услуги и быт</a>
-                <a href="/user/cleaning" class="module-button"><i class="fas fa-soap"></i> Уборка и гигиена</a>
+                <a href="user_services.html" class="module-button"><i class="fas fa-tools"></i> Услуги и быт</a>
+                <a href="user_cleaning.html" class="module-button"><i class="fas fa-soap"></i> Уборка и гигиена</a>
             </div>
         </div>
 
         <div class="category-section">
             <h3 class="category-title"><i class="fas fa-building"></i> Бизнес и коммерция</h3>
             <div class="modules-grid">
-                <a href="/user/business" class="module-button"><i class="fas fa-store"></i> Бизнес и магазины</a>
+                <a href="user_business.html" class="module-button"><i class="fas fa-store"></i> Бизнес и магазины</a>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <h3 class="category-title"><i class="fas fa-heartbeat"></i> Медицина и здоровье</h3>
+            <div class="modules-grid">
+                <a href="user_medicine.html" class="module-button"><i class="fas fa-heartbeat"></i> Медицина и здоровье</a>
             </div>
         </div>
 
         <div class="category-section">
             <h3 class="category-title"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</h3>
             <div class="modules-grid">
-                <a href="/user/energy" class="module-button"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</a>
+                <a href="user_energy.html" class="module-button"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</a>
             </div>
         </div>
 
@@ -482,13 +489,6 @@
             <div class="modules-grid">
                 <a href="#" class="module-button"><i class="fas fa-graduation-cap"></i> Образование и школы</a>
                 <a href="#" class="module-button"><i class="fas fa-book-open"></i> Курсы и тренинги</a>
-            </div>
-        </div>
-
-        <div class="category-section">
-            <h3 class="category-title"><i class="fas fa-heartbeat"></i> Медицина</h3>
-            <div class="modules-grid">
-                <a href="#" class="module-button"><i class="fas fa-heartbeat"></i> Медицина и здоровье</a>
             </div>
         </div>
 
