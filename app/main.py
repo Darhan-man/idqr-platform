@@ -1,3 +1,5 @@
+[file name]: main (1).py
+[file content begin]
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, Response
 import sqlite3
 import hashlib
@@ -18,6 +20,13 @@ from reportlab.lib.utils import ImageReader
 import uuid
 import traceback
 from urllib.parse import urlparse, urljoin
+
+# Исправление для ASGI/WSGI совместимости
+try:
+    from asgiref.wsgi import WsgiToAsgi
+    ASGI_COMPATIBLE = True
+except ImportError:
+    ASGI_COMPATIBLE = False
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -3338,10 +3347,14 @@ def is_safe_url(target):
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+# Инициализация базы данных при запуске
+init_db()
+
+# Обертываем Flask приложение в ASGI совместимую обертку для Uvicorn
+if ASGI_COMPATIBLE:
+    app = WsgiToAsgi(app)
+
 if __name__ == '__main__':
-    # Инициализируем базу данных
-    init_db()
-    
     print("\n" + "="*60)
     print("🚀 IDQR СИСТЕМА ЗАПУЩЕНА!")
     print("="*60)
@@ -3384,3 +3397,4 @@ if __name__ == '__main__':
     
     # Запускаем приложение
     app.run(host='0.0.0.0', port=5000, debug=True)
+[file content end]
