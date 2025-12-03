@@ -2,6 +2,7 @@
 fastapi            # фреймворк для создания веб-приложений и API
 uvicorn            # ASGI-сервер для запуска FastAPI
 flask
+reportlab
 
 # --- Шаблоны и статика ---
 jinja2             # шаблонизатор HTML для FastAPI
