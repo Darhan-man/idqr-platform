@@ -33,6 +33,9 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 app.config['DATABASE'] = 'idqr_system.db'
 
+# Конфигурация базы данных для использования в функциях
+DATABASE_PATH = 'idqr_system.db'
+
 # Создаем необходимые папки
 for folder in ['uploads', 'templates', 'static', 'static/images', 'static/css', 'static/js']:
     if not os.path.exists(folder):
@@ -42,7 +45,8 @@ for folder in ['uploads', 'templates', 'static', 'static/images', 'static/css', 
 
 def get_db_connection():
     """Создание соединения с базой данных"""
-    conn = sqlite3.connect(app.config['DATABASE'])
+    # Используем DATABASE_PATH вместо app.config
+    conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1801,7 +1805,7 @@ def events_page():
 @app.route('/modules/docs')
 @app.route('/docs')
 def docs_page():
-    """Страница документов и удостоверений"""
+    """Страница документов и удостоверения"""
     theme = 'light'
     if 'user_id' in session:
         user = get_user_by_id(session['user_id'])
@@ -3359,7 +3363,7 @@ if __name__ == '__main__':
     print(f"📍 Главная страница: http://localhost:5000")
     print(f"🔑 Админ панель: http://localhost:5000/admin")
     print(f"👤 Тестовый администратор: admin / admin123")
-    print(f"📊 База данных: {app.config['DATABASE']}")
+    print(f"📊 База данных: {DATABASE_PATH}")
     print(f"📁 Загрузки: {app.config['UPLOAD_FOLDER']}")
     print("="*60)
     print("📋 Доступные модули:")
