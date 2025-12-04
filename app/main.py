@@ -3308,39 +3308,6 @@ def before_request():
         finally:
             conn.close()
 
-# ==================== ОБРАБОТЧИКИ ОШИБОК ====================
-
-@app.errorhandler(404)
-def page_not_found(e):
-    """Обработка ошибки 404"""
-    if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Ресурс не найден'}), 404
-    
-    user = get_user_by_id(session['user_id']) if 'user_id' in session else None
-    return render_template('404.html', user=user), 404
-
-@app.errorhandler(500)
-def internal_server_error(e):
-    """Обработка ошибки 500"""
-    # Логируем ошибку
-    user_id = session.get('user_id')
-    log_error(user_id, 'internal_server_error', str(e), traceback.format_exc())
-    
-    if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Внутренняя ошибка сервера'}), 500
-    
-    user = get_user_by_id(user_id) if user_id else None
-    return render_template('500.html', user=user), 500
-
-@app.errorhandler(403)
-def forbidden(e):
-    """Обработка ошибки 403"""
-    if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Доступ запрещен'}), 403
-    
-    user = get_user_by_id(session['user_id']) if 'user_id' in session else None
-    return render_template('403.html', user=user), 403
-
 # ==================== ЗАПУСК ПРИЛОЖЕНИЯ ====================
 
 def is_safe_url(target):
