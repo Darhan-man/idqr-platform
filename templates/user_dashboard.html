@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDQR — Панель пользователя</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #00C9A7;
+            --primary-dark: #00B89A;
+            --secondary: #6DDFFF;
+            --accent: #6C63FF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+            --border-radius: 16px;
+            --border-radius-sm: 12px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #00D6B3;
+            --primary-dark: #00C9A7;
+            --secondary: #81E6FF;
+            --accent: #817BFF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--text-primary);
+            padding: 1.2rem 2.5rem;
+            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .welcome {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            background: var(--error);
+            color: white;
+            border: none;
+            padding: 0.7rem 1.2rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .logout-btn:hover {
+            background: #FF4A7A;
+            transform: translateY(-2px);
+        }
+
+        .role-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-ip {
+            background: var(--secondary);
+        }
+
+        .role-admin {
+            background: var(--primary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .info-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 2.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            margin-bottom: 2rem;
+            border: 1px solid var(--card-border);
+        }
+
+        .info-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            display: block;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .info-text {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .module-button {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            text-align: left;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: 1px solid var(--card-border);
+            cursor: pointer;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .module-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: var(--transition);
+            z-index: -1;
+        }
+
+        .module-button:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            color: white;
+        }
+
+        .module-button:hover::before {
+            opacity: 1;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0.1;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .modules-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar h1 {
+                font-size: 1.4rem;
+            }
+            
+            h2 {
+                font-size: 1.4rem;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .module-button {
+                padding: 1.2rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body data-theme="{{ user[10] if user else 'light' }}">
+    <div class="particles" id="particles"></div>
+    
+    <div class="navbar">
+        <h1><i class="fas fa-user"></i> IDQR: Панель пользователя</h1>
+        <div class="user-info">
+            <span class="welcome">
+                Добро пожаловать, {{ user[1] }}!
+                {% if user[3] == 'ip' %}
+                    <span class="role-badge role-ip">ИП</span>
+                {% elif user[3] == 'admin' %}
+                    <span class="role-badge role-admin">Admin</span>
+                {% endif %}
+            </span>
+            <a href="/logout" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Выйти
+            </a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2><i class="fas fa-tachometer-alt"></i> Доступные модули</h2>
+        
+        <div class="info-card">
+            <span class="info-icon"><i class="fas fa-info-circle"></i></span>
+            <p class="info-text">
+                {% if user[3] == 'ip' %}
+                    Вы вошли как индивидуальный предприниматель. У вас есть доступ к созданию QR-кодов и всем модулям.
+                {% elif user[3] == 'admin' %}
+                    Вы вошли как администратор. У вас есть полный доступ ко всем функциям системы.
+                {% else %}
+                    Вы вошли как обычный пользователь. Доступен только просмотр модулей без возможности редактирования.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="modules-grid">
+            <a href="/user/modules" class="module-button">
+                <i class="fas fa-puzzle-piece"></i> Все модули
+            </a>
+            <a href="/user/services" class="module-button">
+                <i class="fas fa-home"></i> Услуги и быт
+            </a>
+            <a href="/user/business" class="module-button">
+                <i class="fas fa-building"></i> Бизнес и магазины
+            </a>
+            <a href="/user/cleaning" class="module-button">
+                <i class="fas fa-soap"></i> Уборка и гигиена
+            </a>
+            
+            {% if user[3] in ['ip', 'admin'] %}
+            <a href="/dashboard/qr" class="module-button">
+                <i class="fas fa-qrcode"></i> Создание QR-кодов
+            </a>
+            {% endif %}
+            
+            <a href="/user/contact" class="module-button">
+                <i class="fas fa-headset"></i> Связь с поддержкой
+            </a>
+            <a href="/user/settings" class="module-button">
+                <i class="fas fa-cog"></i> Настройки
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const size = Math.random() * 50 + 10;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                particle.style.animationDelay = `-${Math.random() * 20}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
+
+            // Применяем тему из localStorage при загрузке
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+        });
+    </script>
+</body>
+</html>

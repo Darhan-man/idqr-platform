@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDQR — Системные настройки</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --primary-dark: #564FD8;
+            --secondary: #FF64B4;
+            --accent: #6DDFFF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --warning: #FFA726;
+            --info: #6DDFFF;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+            --border-radius: 16px;
+            --border-radius-sm: 12px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #817BFF;
+            --primary-dark: #6C63FF;
+            --secondary: #FF7AC6;
+            --accent: #81E6FF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --warning: #FFB74D;
+            --info: #81E6FF;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--text-primary);
+            padding: 1.2rem 2.5rem;
+            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .navbar nav {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .navbar a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.7rem 1.2rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar a:hover {
+            color: var(--text-primary);
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        .navbar a.active {
+            background: rgba(108, 99, 255, 0.2);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .theme-switch-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .theme-switch {
+            display: inline-block;
+            position: relative;
+            width: 60px;
+            height: 34px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .setting-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--card-border);
+            transition: var(--transition);
+        }
+
+        .setting-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-5px);
+        }
+
+        .setting-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .setting-title {
+            font-weight: 600;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .setting-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .setting-form {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .form-input {
+            flex: 1;
+            padding: 0.8rem;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        .form-select {
+            padding: 0.8rem;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .btn {
+            padding: 0.8rem 1.2rem;
+            border: none;
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            border: 1px solid var(--card-border);
+            text-align: center;
+        }
+
+        .info-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .info-text {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0.1;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .navbar nav {
+                gap: 0.5rem;
+                justify-content: center;
+            }
+            
+            .navbar a {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .theme-switch {
+                width: 50px;
+                height: 28px;
+            }
+            
+            .slider:before {
+                height: 20px;
+                width: 20px;
+            }
+            
+            input:checked + .slider:before {
+                transform: translateX(22px);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar h1 {
+                font-size: 1.4rem;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .setting-form {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body data-theme="{{ user[10] if user else 'light' }}">
+    <div class="particles" id="particles"></div>
+    
+    <div class="navbar">
+        <h1><i class="fas fa-cogs"></i> IDQR: Системные настройки</h1>
+        <nav>
+            <a href="/dashboard/qr"><i class="fas fa-qrcode"></i> QR-Коды</a>
+            <a href="/dashboard/modules"><i class="fas fa-puzzle-piece"></i> Модули</a>
+            <a href="/dashboard/users"><i class="fas fa-user"></i> Пользователи</a>
+            <a href="/dashboard/ip"><i class="fas fa-network-wired"></i> IP-Блокировки</a>
+            <a href="/dashboard/stats"><i class="fas fa-chart-bar"></i> Статистика</a>
+            <a href="/dashboard/logs"><i class="fas fa-clipboard-list"></i> Логи</a>
+            <a href="/dashboard/system" class="active"><i class="fas fa-cog"></i> Настройки</a>
+        </nav>
+        
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" {% if user and user[10] == 'dark' %}checked{% endif %} />
+                <div class="slider">
+                    <i class="fas fa-sun sun"></i>
+                    <i class="fas fa-moon moon"></i>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2><i class="fas fa-sliders-h"></i> Системные настройки</h2>
+        
+        <div class="info-card">
+            <span class="info-icon"><i class="fas fa-info-circle"></i></span>
+            <p class="info-text">
+                На этой странице вы можете настроить основные параметры системы. Изменения вступят в силу сразу после сохранения.
+            </p>
+        </div>
+        
+        {% if error %}
+        <div style="background: rgba(255, 107, 147, 0.1); color: var(--error); padding: 1rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-exclamation-circle"></i> {{ error }}
+        </div>
+        {% endif %}
+        
+        {% if success %}
+        <div style="background: rgba(0, 201, 167, 0.1); color: var(--success); padding: 1rem; border-radius: var(--border-radius); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-check-circle"></i> {{ success }}
+        </div>
+        {% endif %}
+
+        <div class="settings-grid">
+            {% for setting in settings_list %}
+            <div class="setting-card">
+                <div class="setting-header">
+                    <div class="setting-title">
+                        {% if setting[1] == 'site_name' %}
+                            <i class="fas fa-globe"></i>
+                        {% elif setting[1] == 'max_qr_per_user' %}
+                            <i class="fas fa-qrcode"></i>
+                        {% elif setting[1] == 'registration_enabled' %}
+                            <i class="fas fa-user-plus"></i>
+                        {% else %}
+                            <i class="fas fa-cog"></i>
+                        {% endif %}
+                        {{ setting[3] or setting[1] }}
+                    </div>
+                </div>
+                
+                <div class="setting-description">
+                    {% if setting[1] == 'site_name' %}
+                        Название сайта, отображаемое в заголовках страниц
+                    {% elif setting[1] == 'max_qr_per_user' %}
+                        Максимальное количество QR-кодов, которое может создать один пользователь
+                    {% elif setting[1] == 'registration_enabled' %}
+                        Разрешить или запретить регистрацию новых пользователей
+                    {% else %}
+                        Системная настройка
+                    {% endif %}
+                </div>
+                
+                <form method="post" action="/dashboard/system/update" class="setting-form">
+                    <input type="hidden" name="setting_key" value="{{ setting[1] }}">
+                    
+                    {% if setting[1] == 'registration_enabled' %}
+                    <select name="setting_value" class="form-select">
+                        <option value="true" {% if setting[2] == 'true' %}selected{% endif %}>Разрешена</option>
+                        <option value="false" {% if setting[2] == 'false' %}selected{% endif %}>Запрещена</option>
+                    </select>
+                    {% else %}
+                    <input type="text" name="setting_value" value="{{ setting[2] }}" class="form-input" required>
+                    {% endif %}
+                    
+                    <button type="submit" class="btn btn-save">
+                        <i class="fas fa-save"></i> Сохранить
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="setting-card">
+            <div class="setting-header">
+                <div class="setting-title">
+                    <i class="fas fa-database"></i> Управление базой данных
+                </div>
+            </div>
+            
+            <div class="setting-description">
+                Опасные операции с базой данных. Будьте осторожны, эти действия нельзя отменить.
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn" style="background: var(--warning); color: white;" onclick="backupDatabase()">
+                    <i class="fas fa-download"></i> Создать бэкап
+                </button>
+                
+                <button class="btn" style="background: var(--info); color: white;" onclick="optimizeDatabase()">
+                    <i class="fas fa-broom"></i> Оптимизировать БД
+                </button>
+                
+                <button class="btn" style="background: var(--error); color: white;" onclick="clearOldLogs()">
+                    <i class="fas fa-trash"></i> Очистить старые логи
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Создание частиц для фона
+        document.addEventListener('DOMContentLoaded', function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 15;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const size = Math.random() * 40 + 10;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                particle.style.animationDelay = `-${Math.random() * 20}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
+            
+            // Обработка переключения темы
+            const toggleSwitch = document.querySelector('#checkbox');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggleSwitch.checked = true;
+            }
+            
+            function switchTheme(e) {
+                let theme = 'light';
+                if (e.target.checked) {
+                    theme = 'dark';
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    theme = 'light';
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+                localStorage.setItem('theme', theme);
+                
+                // Сохраняем тему на сервере если пользователь авторизован
+                fetch('/user/settings/theme', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `theme=${theme}`
+                });
+            }
+            
+            toggleSwitch.addEventListener('change', switchTheme, false);
+        });
+
+        // Функции управления БД
+        function backupDatabase() {
+            if (confirm('Создать резервную копию базы данных?')) {
+                alert('Функция бэкапа в разработке');
+            }
+        }
+
+        function optimizeDatabase() {
+            if (confirm('Оптимизировать базу данных для улучшения производительности?')) {
+                alert('Функция оптимизации в разработке');
+            }
+        }
+
+        function clearOldLogs() {
+            if (confirm('Удалить логи старше 30 дней? Это действие нельзя отменить.')) {
+                alert('Функция очистки логов в разработке');
+            }
+        }
+    </script>
+</body>
+</html>

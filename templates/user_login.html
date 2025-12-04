@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR — Вход в систему</title>
+    <title>IDQR — Вход для пользователей</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            /* Светлая тема (по умолчанию) */
             --primary: #6C63FF;
             --primary-dark: #564FD8;
             --secondary: #FF64B4;
@@ -31,7 +30,6 @@
         }
 
         [data-theme="dark"] {
-            /* Тёмная тема */
             --primary: #817BFF;
             --primary-dark: #6C63FF;
             --secondary: #FF7AC6;
@@ -75,91 +73,21 @@
             position: relative;
         }
 
-        .theme-switch-wrapper {
+        .back-button {
             position: absolute;
             top: -60px;
-            right: 0;
+            left: 0;
+            color: var(--text-secondary);
+            text-decoration: none;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-        }
-
-        .theme-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
             font-weight: 500;
+            transition: var(--transition);
         }
 
-        .theme-switch {
-            display: inline-block;
-            position: relative;
-            width: 60px;
-            height: 34px;
-        }
-
-        .theme-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--gray);
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-
-        .slider i {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 14px;
-            color: white;
-            transition: opacity 0.3s ease;
-        }
-
-        .slider .sun {
-            left: 8px;
-            opacity: 0;
-        }
-
-        .slider .moon {
-            right: 8px;
-            opacity: 1;
-        }
-
-        input:checked + .slider .sun {
-            opacity: 1;
-        }
-
-        input:checked + .slider .moon {
-            opacity: 0;
+        .back-button:hover {
+            color: var(--primary);
         }
 
         .login-box {
@@ -183,7 +111,7 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: linear-gradient(45deg, transparent, var(--primary), transparent);
+            background: linear-gradient(45deg, transparent, var(--success), transparent);
             opacity: 0.05;
             transform: rotate(45deg);
             z-index: 0;
@@ -191,23 +119,11 @@
         }
 
         @keyframes shimmer {
-            0% {
-                transform: rotate(45deg) translateX(-50%);
-            }
-            100% {
-                transform: rotate(45deg) translateX(50%);
-            }
+            0% { transform: rotate(45deg) translateX(-50%); }
+            100% { transform: rotate(45deg) translateX(50%); }
         }
 
-        .login-box > * {
-            position: relative;
-            z-index: 1;
-        }
-
-        .login-box:hover {
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
-            transform: translateY(-5px);
-        }
+        .login-box > * { position: relative; z-index: 1; }
 
         h2 {
             color: var(--text-primary);
@@ -222,7 +138,7 @@
 
         .logo {
             font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg, var(--success), var(--accent));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -250,16 +166,14 @@
 
         input:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+            border-color: var(--success);
+            box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.15);
         }
 
-        input::placeholder {
-            color: var(--text-secondary);
-        }
+        input::placeholder { color: var(--text-secondary); }
 
         button {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            background: linear-gradient(135deg, var(--success), var(--accent));
             color: white;
             border: none;
             padding: 1.2rem 2rem;
@@ -272,28 +186,11 @@
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-            transition: var(--transition);
         }
 
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3);
-        }
-
-        button:hover::before {
-            left: 100%;
+            box-shadow: 0 10px 20px rgba(0, 201, 167, 0.3);
         }
 
         .error {
@@ -322,60 +219,25 @@
         .particle {
             position: absolute;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg, var(--success), var(--accent));
             opacity: 0.1;
             animation: float 15s infinite linear;
         }
 
         @keyframes float {
-            0% {
-                transform: translateY(0) rotate(0deg);
-            }
-            100% {
-                transform: translateY(-100vh) rotate(360deg);
-            }
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
         }
 
         @media (max-width: 768px) {
-            .login-box {
-                padding: 2.5rem 2rem;
-            }
-            
-            h2 {
-                font-size: 1.6rem;
-            }
-            
-            .theme-switch {
-                width: 50px;
-                height: 28px;
-            }
-            
-            .slider:before {
-                height: 20px;
-                width: 20px;
-            }
-            
-            input:checked + .slider:before {
-                transform: translateX(22px);
-            }
+            .login-box { padding: 2.5rem 2rem; }
+            h2 { font-size: 1.6rem; }
         }
 
         @media (max-width: 480px) {
-            .login-box {
-                padding: 2rem 1.5rem;
-            }
-            
-            h2 {
-                font-size: 1.4rem;
-            }
-            
-            .theme-switch-wrapper {
-                top: -50px;
-            }
-            
-            .theme-label {
-                display: none;
-            }
+            .login-box { padding: 2rem 1.5rem; }
+            h2 { font-size: 1.4rem; }
+            .back-button { top: -50px; }
         }
     </style>
 </head>
@@ -383,35 +245,30 @@
     <div class="particles" id="particles"></div>
     
     <div class="login-container">
-        <div class="theme-switch-wrapper">
-            <span class="theme-label">Тема</span>
-            <label class="theme-switch" for="checkbox">
-                <input type="checkbox" id="checkbox" />
-                <div class="slider">
-                    <i class="fas fa-sun sun"></i>
-                    <i class="fas fa-moon moon"></i>
-                </div>
-            </label>
-        </div>
+        <a href="/" class="back-button">
+            <i class="fas fa-arrow-left"></i> Назад к админ-панели
+        </a>
         
         <div class="login-box">
-            <h2><span class="logo"><i class="fas fa-key"></i></span> Авторизация администратора</h2>
+            <h2><span class="logo"><i class="fas fa-user"></i></span> Вход для пользователя</h2>
 
             {% if error %}
                 <div class="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
             {% endif %}
 
-            <form method="post" action="/login">
+            <form method="post" action="/user/login">
                 <div class="input-group">
-                    <input type="password" name="code" placeholder="Введите код доступа" required>
+                    <input type="text" name="username" placeholder="Логин" required>
                 </div>
-                <button type="submit"><i class="fas fa-rocket"></i> Войти в систему</button>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Пароль" required>
+                </div>
+                <button type="submit"><i class="fas fa-sign-in-alt"></i> Войти</button>
             </form>
         </div>
     </div>
 
     <script>
-        // Создание частиц для фона
         document.addEventListener('DOMContentLoaded', function() {
             const particlesContainer = document.getElementById('particles');
             const particleCount = 20;
@@ -432,27 +289,6 @@
                 
                 particlesContainer.appendChild(particle);
             }
-            
-            // Обработка переключения темы
-            const toggleSwitch = document.querySelector('#checkbox');
-            const currentTheme = localStorage.getItem('theme') || 'light';
-            
-            if (currentTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                toggleSwitch.checked = true;
-            }
-            
-            function switchTheme(e) {
-                if (e.target.checked) {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.documentElement.setAttribute('data-theme', 'light');
-                    localStorage.setItem('theme', 'light');
-                }    
-            }
-            
-            toggleSwitch.addEventListener('change', switchTheme, false);
         });
     </script>
 </body>
