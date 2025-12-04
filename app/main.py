@@ -19,6 +19,12 @@ import uuid
 import traceback
 from urllib.parse import urlparse, urljoin
 
+# Добавь эту часть В САМОМ НАЧАЛЕ
+from pathlib import Path
+
+# Получаем абсолютный путь к корневой папке проекта
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # Исправление для ASGI/WSGI совместимости
 try:
     from asgiref.wsgi import WsgiToAsgi
@@ -26,15 +32,19 @@ try:
 except ImportError:
     ASGI_COMPATIBLE = False
 
-app = Flask(__name__)
+# СОЗДАЕМ APP С ПРАВИЛЬНЫМ ПУТЕМ К TEMPLATES
+app = Flask(__name__, 
+            template_folder=str(BASE_DIR / 'templates'),
+            static_folder=str(BASE_DIR / 'static') if (BASE_DIR / 'static').exists() else None)
+
 app.secret_key = secrets.token_hex(32)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = str(BASE_DIR / 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
-app.config['DATABASE'] = 'idqr_system.db'
+app.config['DATABASE'] = str(BASE_DIR / 'idqr_system.db')
 
 # Конфигурация базы данных для использования в функциях
-DATABASE_PATH = 'idqr_system.db'
+DATABASE_PATH = str(BASE_DIR / 'idqr_system.db')
 
 # ==================== УТИЛИТЫ БАЗЫ ДАННЫХ ====================
 
