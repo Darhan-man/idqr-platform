@@ -3387,8 +3387,9 @@ def is_safe_url(target):
 init_db()
 
 # Обертываем Flask приложение в ASGI совместимую обертку для Uvicorn
+flask_app = app
 if ASGI_COMPATIBLE:
-    app = WsgiToAsgi(app)
+    app = WsgiToAsgi(flask_app)
 
 if __name__ == '__main__':
     print("\n" + "="*60)
@@ -3424,4 +3425,4 @@ if __name__ == '__main__':
     print("="*60 + "\n")
     
     # Запускаем приложение
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    flask_app.run(host='0.0.0.0', port=5000, debug=True)
