@@ -1,5 +1,3 @@
-[file name]: main (3).py
-[file content begin]
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, Response
 import sqlite3
 import hashlib
@@ -3450,4 +3448,3 @@ if __name__ == '__main__':
     
     # Запускаем приложение
     flask_app.run(host='0.0.0.0', port=5000, debug=True)
-[file content end]
