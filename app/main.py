@@ -36,11 +36,6 @@ app.config['DATABASE'] = 'idqr_system.db'
 # Конфигурация базы данных для использования в функциях
 DATABASE_PATH = 'idqr_system.db'
 
-# Создаем необходимые папки
-for folder in ['uploads', 'templates', 'static', 'static/images', 'static/css', 'static/js']:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
 # ==================== УТИЛИТЫ БАЗЫ ДАННЫХ ====================
 
 def get_db_connection():
@@ -1051,6 +1046,78 @@ def logout():
     
     flash('Вы успешно вышли из системы', 'success')
     return redirect(url_for('index'))
+
+# ==================== ДОПОЛНИТЕЛЬНЫЕ МАРШРУТЫ ИЗ СКРИНОВ ====================
+
+@app.route('/about')
+def about():
+    """Страница 'О компании'"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        theme = user['theme'] if user else 'light'
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_page', 'about', 'Просмотр страницы "О компании"')
+    
+    return render_template('about.html', theme=theme)
+
+@app.route('/contacts')
+def contacts():
+    """Страница 'Контакты'"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        theme = user['theme'] if user else 'light'
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_page', 'contacts', 'Просмотр страницы "Контакты"')
+    
+    return render_template('contacts.html', theme=theme)
+
+@app.route('/portfolio')
+def portfolio():
+    """Страница 'Портфолио'"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        theme = user['theme'] if user else 'light'
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_page', 'portfolio', 'Просмотр страницы "Портфолио"')
+    
+    return render_template('portfolio.html', theme=theme)
+
+@app.route('/blog')
+def blog():
+    """Страница 'Блог'"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        theme = user['theme'] if user else 'light'
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_page', 'blog', 'Просмотр страницы "Блог"')
+    
+    return render_template('blog.html', theme=theme)
+
+@app.route('/contact-form')
+def contact_form():
+    """Страница 'Обратная связь'"""
+    if 'user_id' in session:
+        user = get_user_by_id(session['user_id'])
+        theme = user['theme'] if user else 'light'
+    else:
+        theme = get_system_setting('default_theme', 'light')
+    
+    if 'user_id' in session:
+        log_activity(session['user_id'], 'view_page', 'contact_form', 'Просмотр страницы "Обратная связь"')
+    
+    return render_template('contact_form.html', theme=theme)
 
 # ==================== ПОЛЬЗОВАТЕЛЬСКИЕ МАРШРУТЫ ====================
 
@@ -2462,7 +2529,7 @@ def user_contact():
     
     return render_template('user_contact.html', user=user)
 
-# ==================== АДМИНИСТРАТИВНЫЕ МАРШРУТЫ ====================
+# ==================== ДОПОЛНИТЕЛЬНЫЕ МАРШРУТЫ ИЗ СКРИНОВ ====================
 
 @app.route('/admin')
 @admin_required
@@ -3333,33 +3400,25 @@ if __name__ == '__main__':
     print(f"📊 База данных: {DATABASE_PATH}")
     print(f"📁 Загрузки: {app.config['UPLOAD_FOLDER']}")
     print("="*60)
-    print("📋 Доступные модули:")
-    print("  • /energy - Энергетика и инфраструктура")
-    print("  • /user/energy - Модуль энергетики (требует авторизации)")
-    print("  • /energy/complaints - Жалобы и обращения")
-    print("  • /medicine - Медицина и здоровье")
-    print("  • /user/medicine - Модуль медицины (требует авторизации)")
-    print("  • /business - Бизнес и магазины")
-    print("  • /user/business - Модуль бизнеса (требует авторизации)")
-    print("  • /services - Услуги и быт")
-    print("  • /user/services - Модуль услуг (требует авторизации)")
-    print("  • /clothing - Одежда и мода")
-    print("  • /transport - Транспорт и авто")
-    print("  • /education - Образование")
-    print("  • /construction - Строительство")
-    print("  • /logistics - Логистика")
-    print("  • /housing - ЖКХ")
-    print("  • /events - События")
-    print("  • /docs - Документы")
-    print("  • /gov - Госуслуги")
-    print("  • /security - Безопасность")
-    print("  • /ads - Реклама")
-    print("  • /courses - Курсы")
-    print("  • /gifts - Подарки")
-    print("  • /branding - Маркетинг")
-    print("  • /payment - Оплата")
-    print("  • /modules - Все модули системы")
-    print("  • /user/modules - Модули пользователя")
+    print("📋 Доступные маршруты:")
+    print("  • / - Главная страница")
+    print("  • /about - О компании")
+    print("  • /contacts - Контакты")
+    print("  • /portfolio - Портфолио")
+    print("  • /blog - Блог")
+    print("  • /contact-form - Обратная связь")
+    print("  • /login - Вход")
+    print("  • /register - Регистрация")
+    print("  • /modules - Все модули")
+    print("  • /user/dashboard - Панель управления пользователя")
+    print("  • /energy - Энергетика")
+    print("  • /medicine - Медицина")
+    print("  • /business - Бизнес")
+    print("  • /services - Услуги")
+    print("  • /user/energy - Модуль энергетики")
+    print("  • /user/medicine - Модуль медицины")
+    print("  • /user/business - Модуль бизнеса")
+    print("  • /user/services - Модуль услуг")
     print("="*60)
     print("⚙️  Режим отладки: ВКЛЮЧЕН")
     print("="*60 + "\n")
