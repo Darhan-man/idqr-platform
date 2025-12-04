@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Доступ запрещен - IDQR Система</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #ffc107;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 18px;
+            color: #6c757d;
+            margin-bottom: 30px;
+        }
+        a {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        a:hover {
+            background-color: #0056b3;
+        }
+        .lock-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="lock-icon">🔒</div>
+        <h1>403</h1>
+        <h2>Доступ запрещен</h2>
+        <p>У вас недостаточно прав для доступа к этой странице.</p>
+        {% if current_user %}
+            <a href="/user/dashboard">Вернуться в панель управления</a>
+        {% else %}
+            <a href="/login">Войти в систему</a>
+        {% endif %}
+    </div>
+</body>
+</html>
