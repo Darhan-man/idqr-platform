@@ -1,3 +1,5 @@
+[file name]: main (3).py
+[file content begin]
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, Response
 import sqlite3
 import hashlib
@@ -815,7 +817,11 @@ def api_key_required(f):
 def index():
     """Главная страница"""
     if 'user_id' in session:
-        return redirect(url_for('user_dashboard'))
+        user = get_user_by_id(session['user_id'])
+        if user and user['role'] == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('user_dashboard'))
     
     # Получаем статистику для отображения на главной странице
     conn = get_db_connection()
@@ -840,7 +846,11 @@ def login():
     """Страница входа"""
     # Если пользователь уже авторизован, перенаправляем на дашборд
     if 'user_id' in session:
-        return redirect(url_for('user_dashboard'))
+        user = get_user_by_id(session['user_id'])
+        if user and user['role'] == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('user_dashboard'))
     
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -943,7 +953,11 @@ def register():
     """Страница регистрации"""
     # Если пользователь уже авторизован, перенаправляем на дашборд
     if 'user_id' in session:
-        return redirect(url_for('user_dashboard'))
+        user = get_user_by_id(session['user_id'])
+        if user and user['role'] == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('user_dashboard'))
     
     # Проверяем, включена ли регистрация в системе
     if get_system_setting('registration_enabled', 'true') == 'false':
@@ -3436,3 +3450,4 @@ if __name__ == '__main__':
     
     # Запускаем приложение
     flask_app.run(host='0.0.0.0', port=5000, debug=True)
+[file content end]
