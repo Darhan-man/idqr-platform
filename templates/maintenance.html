@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Техническое обслуживание - IDQR Система</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #6c757d;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 18px;
+            color: #6c757d;
+            margin-bottom: 30px;
+        }
+        .maintenance-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        .progress {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin: 30px 0;
+            height: 20px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #17a2b8;
+            width: 60%;
+            animation: progress 2s ease-in-out infinite;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 100%; }
+            100% { width: 0%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="maintenance-icon">🔧</div>
+        <h1>Техническое обслуживание</h1>
+        <p>Система временно недоступна.</p>
+        <div class="progress">
+            <div class="progress-bar"></div>
+        </div>
+        <p>Пожалуйста, повторите попытку позже.</p>
+    </div>
+</body>
+</html>
