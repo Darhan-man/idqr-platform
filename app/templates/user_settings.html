@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDQR — Настройки пользователя</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #00C9A7;
+            --primary-dark: #00B89A;
+            --secondary: #6DDFFF;
+            --accent: #6C63FF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(255, 255, 255, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.2);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+            --border-radius: 16px;
+            --border-radius-sm: 12px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #00D6B3;
+            --primary-dark: #00C9A7;
+            --secondary: #81E6FF;
+            --accent: #817BFF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --nav-bg: rgba(30, 30, 46, 0.9);
+            --nav-border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--text-primary);
+            padding: 1.2rem 2.5rem;
+            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--nav-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.7rem 1.2rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+            background: rgba(0, 201, 167, 0.1);
+        }
+
+        .nav-links a.active {
+            background: rgba(0, 201, 167, 0.2);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+        }
+
+        .settings-section {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            border: 1px solid var(--card-border);
+        }
+
+        .settings-section h3 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .theme-option {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border: 2px solid var(--card-border);
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .theme-option:hover {
+            border-color: var(--primary);
+        }
+
+        .theme-option.active {
+            border-color: var(--primary);
+            background: rgba(0, 201, 167, 0.1);
+        }
+
+        .theme-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 2px solid var(--card-border);
+        }
+
+        .theme-light {
+            background: linear-gradient(135deg, #F5F7FF, #E6ECFF);
+        }
+
+        .theme-dark {
+            background: linear-gradient(135deg, #1E1E2E, #2D2D44);
+        }
+
+        .upload-form {
+            margin-top: 1.5rem;
+        }
+
+        .upload-form input[type="file"] {
+            width: 100%;
+            padding: 1rem;
+            border: 2px dashed var(--card-border);
+            border-radius: var(--border-radius);
+            background: var(--input-bg);
+            transition: var(--transition);
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        .upload-form input[type="file"]:hover {
+            border-color: var(--primary);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 201, 167, 0.3);
+        }
+
+        .logo-preview {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: var(--input-bg);
+            border-radius: var(--border-radius);
+            text-align: center;
+            border: 1px solid var(--card-border);
+        }
+
+        .logo-preview img {
+            max-height: 120px;
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .user-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-item {
+            padding: 1rem;
+            background: var(--input-bg);
+            border-radius: var(--border-radius-sm);
+            border: 1px solid var(--card-border);
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .role-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .role-ip {
+            background: var(--secondary);
+        }
+
+        .role-admin {
+            background: var(--primary);
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0.1;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-links {
+                gap: 0.5rem;
+            }
+            
+            .theme-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .user-info {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar h1 {
+                font-size: 1.4rem;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .settings-section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body data-theme="{{ user[10] if user else 'light' }}">
+    <div class="particles" id="particles"></div>
+    
+    <div class="navbar">
+        <h1><i class="fas fa-cog"></i> IDQR: Настройки</h1>
+        <div class="nav-links">
+            <a href="/user/dashboard"><i class="fas fa-tachometer-alt"></i> Панель</a>
+            <a href="/user/modules"><i class="fas fa-puzzle-piece"></i> Модули</a>
+            <a href="/user/contact"><i class="fas fa-headset"></i> Связь</a>
+            <a href="/user/settings" class="active"><i class="fas fa-cog"></i> Настройки</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2><i class="fas fa-user-cog"></i> Настройки профиля</h2>
+        
+        <div class="settings-section">
+            <h3><i class="fas fa-palette"></i> Внешний вид</h3>
+            
+            <form method="post" action="/user/settings/theme">
+                <div class="theme-options">
+                    <label class="theme-option {% if user[10] == 'light' %}active{% endif %}">
+                        <input type="radio" name="theme" value="light" {% if user[10] == 'light' %}checked{% endif %} style="display: none;">
+                        <div class="theme-preview theme-light"></div>
+                        <div>
+                            <div style="font-weight: 600;">Светлая тема</div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">Яркая и чистая</div>
+                        </div>
+                    </label>
+                    
+                    <label class="theme-option {% if user[10] == 'dark' %}active{% endif %}">
+                        <input type="radio" name="theme" value="dark" {% if user[10] == 'dark' %}checked{% endif %} style="display: none;">
+                        <div class="theme-preview theme-dark"></div>
+                        <div>
+                            <div style="font-weight: 600;">Тёмная тема</div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">Комфорт для глаз</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <button type="submit">
+                    <i class="fas fa-save"></i> Сохранить тему
+                </button>
+            </form>
+        </div>
+
+        <div class="settings-section">
+            <h3><i class="fas fa-image"></i> Логотип профиля</h3>
+            
+            <form method="post" action="/user/settings/upload_logo" enctype="multipart/form-data" class="upload-form">
+                <input type="file" name="logo" accept="image/*" required>
+                <button type="submit">
+                    <i class="fas fa-upload"></i> Загрузить логотип
+                </button>
+            </form>
+            
+            {% if user[11] %}
+            <div class="logo-preview">
+                <p>Текущий логотип:</p>
+                <img src="{{ user[11] }}" alt="Логотип профиля">
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="settings-section">
+            <h3><i class="fas fa-info-circle"></i> Информация об аккаунте</h3>
+            
+            <div class="user-info">
+                <div class="info-item">
+                    <div class="info-label">Имя пользователя</div>
+                    <div class="info-value">{{ user[1] }}</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label">Роль</div>
+                    <div class="info-value">
+                        {% if user[3] == 'user' %}
+                            Обычный пользователь
+                        {% elif user[3] == 'ip' %}
+                            Индивидуальный предприниматель
+                            <span class="role-badge role-ip">ИП</span>
+                        {% else %}
+                            Администратор
+                            <span class="role-badge role-admin">Admin</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label">Дата регистрации</div>
+                    <div class="info-value">{{ user[5][:10] if user[5] else 'Н/Д' }}</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label">Последний вход</div>
+                    <div class="info-value">{{ user[6][:16] if user[6] else 'Никогда' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 15;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                const size = Math.random() * 40 + 10;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                particle.style.animationDelay = `-${Math.random() * 20}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
+
+            // Обработка выбора темы
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.theme-option').forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    this.querySelector('input[type="radio"]').checked = true;
+                });
+            });
+
+            // Применяем тему из localStorage при загрузке
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+        });
+    </script>
+</body>
+</html>
