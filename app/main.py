@@ -3290,11 +3290,11 @@ def before_request():
         # Разрешаем доступ только администраторам
         if request.endpoint and request.endpoint not in ['login', 'static']:
             if 'user_id' not in session:
-                return render_template('maintenance.html'), 503
+                return "Сайт на техническом обслуживании. Пожалуйста, зайдите позже.", 503
             
             user = get_user_by_id(session['user_id'])
             if not user or user['role'] != 'admin':
-                return render_template('maintenance.html'), 503
+                return "Сайт на техническом обслуживании. Пожалуйста, зайдите позже.", 503
     
     # Обновляем время последней активности для авторизованных пользователей
     if 'user_id' in session:
