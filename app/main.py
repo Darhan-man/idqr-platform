@@ -123,6 +123,37 @@ async def startup():
                 )
             """)
             
+            # Таблица жалоб
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS complaints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    title TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    status TEXT DEFAULT 'new',
+                    priority TEXT DEFAULT 'medium',
+                    assigned_to INTEGER,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    resolved_at TEXT
+                )
+            """)
+            
+            # Таблица медицинских данных
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS medical_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    category TEXT NOT NULL,
+                    data_type TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    date_recorded TEXT NOT NULL,
+                    notes TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+            
             # Создаем администратора по умолчанию
             admin_password = "admin123"
             await db.execute("""
@@ -1898,6 +1929,229 @@ async def admin_dashboard(request: Request):
         "user": user,
         "active": "dashboard"
     })
+
+# --- ЖАЛОБЫ (Общие функции) ---
+@app.post("/submit_complaint")
+async def submit_complaint(
+    request: Request,
+    title: str = Form(...),
+    category: str = Form(...),
+    description: str = Form(...),
+    priority: str = Form("medium")
+):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            created_at = datetime.now().isoformat()
+            await db.execute(
+                "INSERT INTO complaints (user_id, title, category, description, status, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user[0], title, category, description, "new", priority, created_at, created_at)
+            )
+            await db.commit()
+            
+            # Логируем создание жалобы
+            await log_action(user[0], "complaint_create", f"Создана жалоба: {title}")
+            
+        return RedirectResponse(url="/user/complaint/success", status_code=303)
+    except Exception as e:
+        logger.error(f"Ошибка при создании жалобы: {e}")
+        return RedirectResponse(url="/user/complaint/form?error=create_failed", status_code=303)
+
+# --- Управление жалобами для админа ---
+@app.get("/dashboard/complaints", response_class=HTMLResponse)
+async def admin_complaints(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT c.*, u.username 
+                FROM complaints c 
+                LEFT JOIN users u ON c.user_id = u.id 
+                ORDER BY c.created_at DESC
+            """)
+            complaints_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("complaints_admin.html", {
+            "request": request,
+            "active": "complaints",
+            "complaints_list": complaints_list,
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке жалоб: {e}")
+        return templates.TemplateResponse("complaints_admin.html", {
+            "request": request,
+            "active": "complaints",
+            "complaints_list": [],
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- Обновление статуса жалобы ---
+@app.post("/dashboard/complaints/update/{complaint_id}")
+async def update_complaint_status(
+    request: Request,
+    complaint_id: int,
+    status: str = Form(...),
+    assigned_to: Optional[int] = Form(None)
+):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "UPDATE complaints SET status = ?, assigned_to = ?, updated_at = ? WHERE id = ?",
+                (status, assigned_to, datetime.now().isoformat(), complaint_id)
+            )
+            await db.commit()
+            
+            # Логируем обновление статуса жалобы
+            await log_action(user[0], "complaint_update", f"Обновлен статус жалобы #{complaint_id} на {status}")
+            
+        return RedirectResponse(url="/dashboard/complaints", status_code=303)
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении статуса жалобы: {e}")
+        return RedirectResponse(url="/dashboard/complaints", status_code=303)
+
+# --- Просмотр жалобы ---
+@app.get("/dashboard/complaints/view/{complaint_id}", response_class=HTMLResponse)
+async def view_complaint(request: Request, complaint_id: int):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT c.*, u.username, a.username as assigned_name 
+                FROM complaints c 
+                LEFT JOIN users u ON c.user_id = u.id 
+                LEFT JOIN users a ON c.assigned_to = a.id 
+                WHERE c.id = ?
+            """, (complaint_id,))
+            complaint = await cursor.fetchone()
+            
+            if not complaint:
+                return RedirectResponse(url="/dashboard/complaints", status_code=303)
+            
+            # Получаем список пользователей для назначения
+            cursor = await db.execute("SELECT id, username FROM users WHERE role IN ('admin', 'moderator')")
+            users_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("complaint_view.html", {
+            "request": request,
+            "complaint": complaint,
+            "users_list": users_list,
+            "active": "complaints",
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при просмотре жалобы: {e}")
+        return RedirectResponse(url="/dashboard/complaints", status_code=303)
+
+# --- Мои жалобы для пользователя ---
+@app.get("/user/complaints", response_class=HTMLResponse)
+async def user_complaints(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT * FROM complaints 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC
+            """, (user[0],))
+            complaints_list = await cursor.fetchall()
+        
+        return templates.TemplateResponse("complaint_status.html", {
+            "request": request,
+            "complaints_list": complaints_list,
+            "active": "complaints",
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке жалоб пользователя: {e}")
+        return templates.TemplateResponse("complaint_status.html", {
+            "request": request,
+            "complaints_list": [],
+            "active": "complaints",
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- Медицинские данные ---
+@app.get("/user/medicine/data", response_class=HTMLResponse)
+async def user_medical_data(request: Request):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute("""
+                SELECT category, data_type, value, date_recorded, notes 
+                FROM medical_data 
+                WHERE user_id = ? 
+                ORDER BY date_recorded DESC
+            """, (user[0],))
+            medical_data = await cursor.fetchall()
+        
+        return templates.TemplateResponse("medical_data.html", {
+            "request": request,
+            "medical_data": medical_data,
+            "active": "medicine",
+            "user": user
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке медицинских данных: {e}")
+        return templates.TemplateResponse("medical_data.html", {
+            "request": request,
+            "medical_data": [],
+            "active": "medicine",
+            "user": user,
+            "error": "Ошибка при загрузке данных"
+        })
+
+# --- Добавление медицинских данных ---
+@app.post("/user/medicine/add")
+async def add_medical_data(
+    request: Request,
+    category: str = Form(...),
+    data_type: str = Form(...),
+    value: str = Form(...),
+    date_recorded: str = Form(...),
+    notes: Optional[str] = Form(None)
+):
+    user = await check_user_access(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            created_at = datetime.now().isoformat()
+            await db.execute(
+                "INSERT INTO medical_data (user_id, category, data_type, value, date_recorded, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (user[0], category, data_type, value, date_recorded, notes, created_at)
+            )
+            await db.commit()
+            
+            # Логируем добавление медицинских данных
+            await log_action(user[0], "medical_data_add", f"Добавлены медицинские данные: {category} - {data_type}")
+            
+        return RedirectResponse(url="/user/medicine/data", status_code=303)
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении медицинских данных: {e}")
+        return RedirectResponse(url="/user/medicine/data?error=add_failed", status_code=303)
 
 # --- СТРАНИЦЫ ОШИБОК ---
 @app.get("/user/blocked", response_class=HTMLResponse)
