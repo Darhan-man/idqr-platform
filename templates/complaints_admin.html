@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDQR: Управление жалобами</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #6C63FF;
+      --primary-dark: #564FD8;
+      --secondary: #FF64B4;
+      --accent: #6DDFFF;
+      --light: #F8FAFF;
+      --dark: #1E1E2E;
+      --gray: #8B8B9F;
+      --success: #00C9A7;
+      --warning: #FFA726;
+      --error: #FF6B93;
+      --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --card-border: rgba(255, 255, 255, 0.2);
+      --text-primary: #1E1E2E;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(255, 255, 255, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.2);
+      --input-bg: rgba(255, 255, 255, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+      --border-radius: 16px;
+      --border-radius-sm: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    [data-theme="dark"] {
+      --primary: #817BFF;
+      --primary-dark: #6C63FF;
+      --secondary: #FF7AC6;
+      --accent: #81E6FF;
+      --light: #252536;
+      --dark: #F0F0F0;
+      --gray: #7B7B8F;
+      --success: #00D6B3;
+      --warning: #FFB74D;
+      --error: #FF7A9E;
+      --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+      --card-bg: rgba(30, 30, 46, 0.9);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-primary: #F0F0F0;
+      --text-secondary: #8B8B9F;
+      --nav-bg: rgba(30, 30, 46, 0.9);
+      --nav-border: rgba(255, 255, 255, 0.1);
+      --input-bg: rgba(30, 30, 46, 0.7);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    h2 {
+      text-align: center;
+      margin: 2.5rem 0;
+      color: var(--text-primary);
+      font-size: 2.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      font-weight: 700;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 1.5rem;
+      border-radius: var(--border-radius);
+      text-align: center;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--card-border);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 1rem;
+      color: var(--text-secondary);
+    }
+
+    .complaints-table {
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--card-border);
+      margin-bottom: 2rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 1rem 1.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      background: rgba(var(--primary-rgb), 0.1);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    tr:hover {
+      background: rgba(var(--primary-rgb), 0.05);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .status-new {
+      background: var(--accent);
+      color: var(--dark);
+    }
+
+    .status-in-progress {
+      background: var(--warning);
+      color: var(--dark);
+    }
+
+    .status-resolved {
+      background: var(--success);
+      color: white;
+    }
+
+    .status-closed {
+      background: var(--gray);
+      color: white;
+    }
+
+    .priority-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .priority-low {
+      background: var(--success);
+      color: white;
+    }
+
+    .priority-medium {
+      background: var(--warning);
+      color: var(--dark);
+    }
+
+    .priority-high {
+      background: var(--error);
+      color: white;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--border-radius-sm);
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-view {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-view:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    .btn-resolve {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-resolve:hover {
+      background: #00B395;
+      transform: translateY(-2px);
+    }
+
+    .filters {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-select {
+      padding: 0.75rem 1rem;
+      border-radius: var(--border-radius-sm);
+      border: 1px solid var(--card-border);
+      background: var(--input-bg);
+      color: var(--text-primary);
+      min-width: 200px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: var(--border-radius-sm);
+      border: 1px solid var(--card-border);
+      background: var(--input-bg);
+      color: var(--text-primary);
+    }
+
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      opacity: 0.1;
+      animation: float 15s infinite linear;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0) rotate(0deg);
+      }
+      100% {
+        transform: translateY(-100vh) rotate(360deg);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+      
+      .filters {
+        flex-direction: column;
+      }
+      
+      .filter-select, .search-input {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .container {
+        padding: 0 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+
+  <div class="container">
+    <h2><i class="fas fa-exclamation-circle"></i> Управление жалобами</h2>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">15</div>
+        <div class="stat-label">Новых жалоб</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">42</div>
+        <div class="stat-label">В работе</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">128</div>
+        <div class="stat-label">Решено</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">8</div>
+        <div class="stat-label">Высокий приоритет</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <select class="filter-select">
+        <option value="">Все статусы</option>
+        <option value="new">Новые</option>
+        <option value="in_progress">В работе</option>
+        <option value="resolved">Решено</option>
+        <option value="closed">Закрыто</option>
+      </select>
+      
+      <select class="filter-select">
+        <option value="">Все приоритеты</option>
+        <option value="low">Низкий</option>
+        <option value="medium">Средний</option>
+        <option value="high">Высокий</option>
+      </select>
+      
+      <select class="filter-select">
+        <option value="">Все категории</option>
+        <option value="technical">Технические</option>
+        <option value="billing">Биллинг</option>
+        <option value="content">Контент</option>
+        <option value="other">Другое</option>
+      </select>
+      
+      <input type="text" class="search-input" placeholder="Поиск по жалобам...">
+    </div>
+
+    <div class="complaints-table">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Заголовок</th>
+            <th>Пользователь</th>
+            <th>Категория</th>
+            <th>Статус</th>
+            <th>Приоритет</th>
+            <th>Дата создания</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>#125</td>
+            <td>Не работает генерация QR-кода</td>
+            <td>ivanov</td>
+            <td>Технические</td>
+            <td><span class="status-badge status-new">Новая</span></td>
+            <td><span class="priority-badge priority-high">Высокий</span></td>
+            <td>15.03.2024 14:30</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>#124</td>
+            <td>Ошибка при сканировании QR</td>
+            <td>petrov</td>
+            <td>Технические</td>
+            <td><span class="status-badge status-in-progress">В работе</span></td>
+            <td><span class="priority-badge priority-medium">Средний</span></td>
+            <td>14.03.2024 11:15</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>#123</td>
+            <td>Вопрос по тарифам</td>
+            <td>sidorov</td>
+            <td>Биллинг</td>
+            <td><span class="status-badge status-resolved">Решено</span></td>
+            <td><span class="priority-badge priority-low">Низкий</span></td>
+            <td>13.03.2024 16:45</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>#122</td>
+            <td>Предложение по улучшению</td>
+            <td>smirnov</td>
+            <td>Контент</td>
+            <td><span class="status-badge status-new">Новая</span></td>
+            <td><span class="priority-badge priority-medium">Средний</span></td>
+            <td>12.03.2024 09:20</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>#121</td>
+            <td>Проблема с доступом к модулям</td>
+            <td>kozlov</td>
+            <td>Технические</td>
+            <td><span class="status-badge status-in-progress">В работе</span></td>
+            <td><span class="priority-badge priority-high">Высокий</span></td>
+            <td>11.03.2024 18:10</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>#120</td>
+            <td>Запрос на удаление аккаунта</td>
+            <td>morozov</td>
+            <td>Другое</td>
+            <td><span class="status-badge status-closed">Закрыто</span></td>
+            <td><span class="priority-badge priority-medium">Средний</span></td>
+            <td>10.03.2024 13:25</td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-view"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-resolve"><i class="fas fa-check"></i></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="complaints-table">
+      <h3 style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--card-border);">Статистика по жалобам</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Категория</th>
+            <th>Новые</th>
+            <th>В работе</th>
+            <th>Решено</th>
+            <th>Всего</th>
+            <th>Среднее время решения</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Технические</td>
+            <td>8</td>
+            <td>15</td>
+            <td>45</td>
+            <td>68</td>
+            <td>2 дня 4 часа</td>
+          </tr>
+          <tr>
+            <td>Биллинг</td>
+            <td>3</td>
+            <td>8</td>
+            <td>32</td>
+            <td>43</td>
+            <td>1 день 8 часов</td>
+          </tr>
+          <tr>
+            <td>Контент</td>
+            <td>2</td>
+            <td>5</td>
+            <td>18</td>
+            <td>25</td>
+            <td>3 дня</td>
+          </tr>
+          <tr>
+            <td>Другое</td>
+            <td>2</td>
+            <td>14</td>
+            <td>33</td>
+            <td>49</td>
+            <td>4 дня</td>
+          </tr>
+          <tr>
+            <td><strong>Итого</strong></td>
+            <td><strong>15</strong></td>
+            <td><strong>42</strong></td>
+            <td><strong>128</strong></td>
+            <td><strong>185</strong></td>
+            <td><strong>2 дня 18 часов</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 15;
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        const size = Math.random() * 40 + 10;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        particle.style.left = `${Math.random() * 100}vw`;
+        particle.style.top = `${Math.random() * 100}vh`;
+        
+        particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+        particle.style.animationDelay = `-${Math.random() * 20}s`;
+        
+        particlesContainer.appendChild(particle);
+      }
+
+      // Фильтрация таблицы
+      const filterSelects = document.querySelectorAll('.filter-select');
+      const searchInput = document.querySelector('.search-input');
+      const tableRows = document.querySelectorAll('tbody tr');
+
+      function filterTable() {
+        const statusFilter = filterSelects[0].value;
+        const priorityFilter = filterSelects[1].value;
+        const categoryFilter = filterSelects[2].value;
+        const searchText = searchInput.value.toLowerCase();
+
+        tableRows.forEach(row => {
+          const status = row.querySelector('.status-badge').className.includes(statusFilter) || !statusFilter;
+          const priority = row.querySelector('.priority-badge').className.includes(priorityFilter) || !priorityFilter;
+          const category = row.cells[3].textContent.toLowerCase().includes(categoryFilter) || !categoryFilter;
+          const searchMatch = row.textContent.toLowerCase().includes(searchText);
+
+          if (status && priority && category && searchMatch) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      }
+
+      filterSelects.forEach(select => {
+        select.addEventListener('change', filterTable);
+      });
+      
+      searchInput.addEventListener('input', filterTable);
+
+      // Обработка кнопок действий
+      const actionButtons = document.querySelectorAll('.action-buttons button');
+      actionButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const row = this.closest('tr');
+          const complaintId = row.cells[0].textContent;
+          const complaintTitle = row.cells[1].textContent;
+          
+          if (this.classList.contains('btn-view')) {
+            alert(`Просмотр жалобы ${complaintId}: ${complaintTitle}`);
+            // В реальном приложении здесь будет переход на страницу просмотра жалобы
+            window.location.href = `/dashboard/complaints/view/${complaintId.replace('#', '')}`;
+          } else if (this.classList.contains('btn-resolve')) {
+            if (confirm(`Вы уверены, что хотите отметить жалобу ${complaintId} как решенную?`)) {
+              const statusBadge = row.querySelector('.status-badge');
+              statusBadge.className = 'status-badge status-resolved';
+              statusBadge.textContent = 'Решено';
+              alert(`Жалоба ${complaintId} отмечена как решенная`);
+            }
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
