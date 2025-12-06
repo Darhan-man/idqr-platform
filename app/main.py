@@ -1582,43 +1582,7 @@ async def user_energy(request: Request):
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("user_energy.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/user/energy/analytics", response_class=HTMLResponse)
-async def user_energy_analytics(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_analytics.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/user/energy/complaints", response_class=HTMLResponse)
-async def user_energy_complaints(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_complaints.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/user/energy/documents", response_class=HTMLResponse)
-async def user_energy_documents(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    return templates.TemplateResponse("energy_documents.html", {
+    return templates.TemplateResponse("energy.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1636,13 +1600,13 @@ async def user_energy_electricity(request: Request):
         "active": "energy"
     })
 
-@app.get("/user/energy/heat_gas", response_class=HTMLResponse)
-async def user_energy_heat_gas(request: Request):
+@app.get("/user/energy/meters", response_class=HTMLResponse)
+async def user_energy_meters(request: Request):
     user = await check_user_access(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_heat_gas.html", {
+    return templates.TemplateResponse("energy_meters.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1660,13 +1624,13 @@ async def user_energy_inspections(request: Request):
         "active": "energy"
     })
 
-@app.get("/user/energy/meters", response_class=HTMLResponse)
-async def user_energy_meters(request: Request):
+@app.get("/user/energy/heat_gas", response_class=HTMLResponse)
+async def user_energy_heat_gas(request: Request):
     user = await check_user_access(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_meters.html", {
+    return templates.TemplateResponse("energy_heat_gas.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1696,22 +1660,21 @@ async def user_energy_suppliers(request: Request):
         "active": "energy"
     })
 
-# --- Energy модули для админа ---
-@app.get("/dashboard/energy", response_class=HTMLResponse)
-async def admin_energy(request: Request):
-    user = await check_admin(request)
+@app.get("/user/energy/consumers", response_class=HTMLResponse)
+async def user_energy_consumers(request: Request):
+    user = await check_user_access(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy.html", {
+    return templates.TemplateResponse("energy_consumers.html", {
         "request": request,
         "user": user,
         "active": "energy"
     })
 
-@app.get("/dashboard/energy/analytics", response_class=HTMLResponse)
-async def admin_energy_analytics(request: Request):
-    user = await check_admin(request)
+@app.get("/user/energy/analytics", response_class=HTMLResponse)
+async def user_energy_analytics(request: Request):
+    user = await check_user_access(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
@@ -1721,25 +1684,26 @@ async def admin_energy_analytics(request: Request):
         "active": "energy"
     })
 
-@app.get("/dashboard/energy/complaints", response_class=HTMLResponse)
-async def admin_energy_complaints(request: Request):
-    user = await check_admin(request)
+@app.get("/user/energy/documents", response_class=HTMLResponse)
+async def user_energy_documents(request: Request):
+    user = await check_user_access(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_complaints.html", {
+    return templates.TemplateResponse("energy_documents.html", {
         "request": request,
         "user": user,
         "active": "energy"
     })
 
-@app.get("/dashboard/energy/documents", response_class=HTMLResponse)
-async def admin_energy_documents(request: Request):
+# --- Energy модули для админа ---
+@app.get("/dashboard/energy", response_class=HTMLResponse)
+async def admin_energy(request: Request):
     user = await check_admin(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_documents.html", {
+    return templates.TemplateResponse("energy.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1757,13 +1721,13 @@ async def admin_energy_electricity(request: Request):
         "active": "energy"
     })
 
-@app.get("/dashboard/energy/heat_gas", response_class=HTMLResponse)
-async def admin_energy_heat_gas(request: Request):
+@app.get("/dashboard/energy/meters", response_class=HTMLResponse)
+async def admin_energy_meters(request: Request):
     user = await check_admin(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_heat_gas.html", {
+    return templates.TemplateResponse("energy_meters.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1781,13 +1745,13 @@ async def admin_energy_inspections(request: Request):
         "active": "energy"
     })
 
-@app.get("/dashboard/energy/meters", response_class=HTMLResponse)
-async def admin_energy_meters(request: Request):
+@app.get("/dashboard/energy/heat_gas", response_class=HTMLResponse)
+async def admin_energy_heat_gas(request: Request):
     user = await check_admin(request)
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("energy_meters.html", {
+    return templates.TemplateResponse("energy_heat_gas.html", {
         "request": request,
         "user": user,
         "active": "energy"
@@ -1817,6 +1781,42 @@ async def admin_energy_suppliers(request: Request):
         "active": "energy"
     })
 
+@app.get("/dashboard/energy/consumers", response_class=HTMLResponse)
+async def admin_energy_consumers(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_consumers.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/analytics", response_class=HTMLResponse)
+async def admin_energy_analytics(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_analytics.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
+@app.get("/dashboard/energy/documents", response_class=HTMLResponse)
+async def admin_energy_documents(request: Request):
+    user = await check_admin(request)
+    if isinstance(user, RedirectResponse) or isinstance(user, dict):
+        return user
+    
+    return templates.TemplateResponse("energy_documents.html", {
+        "request": request,
+        "user": user,
+        "active": "energy"
+    })
+
 # --- Medicine модули для пользователя ---
 @app.get("/user/medicine", response_class=HTMLResponse)
 async def user_medicine(request: Request):
@@ -1824,7 +1824,7 @@ async def user_medicine(request: Request):
     if isinstance(user, RedirectResponse) or isinstance(user, dict):
         return user
     
-    return templates.TemplateResponse("user_medicine.html", {
+    return templates.TemplateResponse("medicine.html", {
         "request": request,
         "user": user,
         "active": "medicine"
