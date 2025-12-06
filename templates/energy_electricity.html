@@ -86,6 +86,27 @@
       font-weight: 700;
     }
 
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--border-radius-sm);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      transition: var(--transition);
+    }
+
+    .back-button:hover {
+      background: var(--primary);
+      color: white;
+      transform: translateY(-2px);
+    }
+
     .modules-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -136,22 +157,6 @@
 
     .module-button:hover::before {
       opacity: 1;
-    }
-
-    .category-section {
-      margin-bottom: 3.5rem;
-    }
-
-    .category-title {
-      color: var(--secondary);
-      margin: 2.5rem 0 1.5rem 0;
-      padding-bottom: 0.75rem;
-      border-bottom: 2px solid var(--card-border);
-      font-size: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-weight: 600;
     }
 
     .particles {
@@ -211,18 +216,19 @@
   <div class="particles" id="particles"></div>
 
   <div class="container">
+    <a href="/dashboard/energy" class="back-button">
+      <i class="fas fa-arrow-left"></i> Назад к категориям
+    </a>
+
     <h2><i class="fas fa-bolt"></i> Электросети и подстанции</h2>
 
-    <div class="category-section">
-      <h3 class="category-title"><i class="fas fa-plug"></i> Подкатегории</h3>
-      <div class="modules-grid">
-        <a href="#" class="module-button"><i class="fas fa-bolt"></i> ЛЭП</a>
-        <a href="#" class="module-button"><i class="fas fa-transformer"></i> КТП и подстанции</a>
-        <a href="#" class="module-button"><i class="fas fa-cable"></i> Кабельные линии</a>
-        <a href="#" class="module-button"><i class="fas fa-cogs"></i> Оборудование</a>
-        <a href="#" class="module-button"><i class="fas fa-file-alt"></i> Паспорта</a>
-        <a href="#" class="module-button"><i class="fas fa-chart-line"></i> Состояние и износ</a>
-      </div>
+    <div class="modules-grid">
+      <a href="#" class="module-button"><i class="fas fa-bolt"></i> ЛЭП</a>
+      <a href="#" class="module-button"><i class="fas fa-subway"></i> КТП и подстанции</a>
+      <a href="#" class="module-button"><i class="fas fa-network-wired"></i> Кабельные линии</a>
+      <a href="#" class="module-button"><i class="fas fa-cogs"></i> Оборудование</a>
+      <a href="#" class="module-button"><i class="fas fa-passport"></i> Паспорта</a>
+      <a href="#" class="module-button"><i class="fas fa-chart-line"></i> Состояние и износ</a>
     </div>
   </div>
 
