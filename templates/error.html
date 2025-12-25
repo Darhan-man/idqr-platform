@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR — Аккаунт заморожен</title>
+    <title>IDQR — Ошибка</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -33,7 +33,7 @@
         
         .error-icon {
             font-size: 5rem;
-            color: #ffa726;
+            color: #ff6b93;
             margin-bottom: 1.5rem;
         }
         
@@ -52,10 +52,10 @@
 <body>
     <div class="error-container">
         <div class="error-icon">
-            <i class="fas fa-snowflake"></i>
+            <i class="fas fa-exclamation-triangle"></i>
         </div>
-        <h1>Аккаунт заморожен</h1>
-        <p>{{ message }}</p>
+        <h1>Произошла ошибка</h1>
+        <p>{{ error }}</p>
         <a href="/" style="display: inline-block; padding: 1rem 2rem; background: #6c63ff; color: white; text-decoration: none; border-radius: 10px;">
             <i class="fas fa-home"></i> Вернуться на главную
         </a>

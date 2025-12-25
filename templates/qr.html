@@ -216,7 +216,7 @@
             color: var(--text-primary);
         }
 
-        input, textarea {
+        input, textarea, select {
             width: 100%;
             padding: 1rem;
             border: 1px solid var(--card-border);
@@ -227,7 +227,7 @@
             transition: var(--transition);
         }
 
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
@@ -512,8 +512,19 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="qrdata">Ссылка или текст:</label>
-                    <textarea id="qrdata" name="qrdata" placeholder="Введите ссылку или текст для кодирования" rows="3" required></textarea>
+                    <label for="qr_type">Тип QR-кода:</label>
+                    <select id="qr_type" name="qr_type" required>
+                        <option value="url">Ссылка на сайт</option>
+                        <option value="module">Доступ к модулю</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="qrdata" id="qrdata_label">Ссылка или текст:</label>
+                    <input type="text" id="qrdata" name="qrdata" placeholder="Введите ссылку или текст для кодирования" required>
+                    <small id="qrdata_help" style="display: block; margin-top: 0.5rem; color: var(--text-secondary);">
+                        Введите URL-адрес или любой текст для кодирования в QR-код
+                    </small>
                 </div>
                 
                 <div class="color-group">
@@ -549,6 +560,11 @@
                 <img src="/static/qr/{{ qr[3] }}" alt="QR Code" class="qr-image">
                 
                 <div class="qr-details">
+                    <div class="qr-detail">
+                        <span class="detail-label">Тип:</span>
+                        <span>{% if qr[9] == 'module' %}Модуль{% else %}Ссылка{% endif %}</span>
+                    </div>
+                    
                     <div class="qr-detail">
                         <span class="detail-label">Ссылка/текст:</span>
                         <span style="font-size: 0.8rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">{{ qr[2][:30] }}...</span>
@@ -638,7 +654,6 @@
                 }
                 localStorage.setItem('theme', theme);
                 
-                // Сохраняем тему на сервере если пользователь авторизован
                 fetch('/user/settings/theme', {
                     method: 'POST',
                     headers: {
@@ -649,6 +664,35 @@
             }
             
             toggleSwitch.addEventListener('change', switchTheme, false);
+            
+            // Динамическое изменение формы в зависимости от типа QR-кода
+            const qrTypeSelect = document.getElementById('qr_type');
+            const qrDataInput = document.getElementById('qrdata');
+            const qrDataLabel = document.getElementById('qrdata_label');
+            const qrDataHelp = document.getElementById('qrdata_help');
+            
+            function updateForm() {
+                if (qrTypeSelect.value === 'module') {
+                    qrDataLabel.textContent = 'ID модуля:';
+                    qrDataInput.placeholder = 'Введите ID модуля (1-19)';
+                    qrDataInput.type = 'number';
+                    qrDataInput.min = '1';
+                    qrDataInput.max = '19';
+                    qrDataInput.step = '1';
+                    qrDataHelp.textContent = 'Для модулей: укажите ID модуля от 1 до 19 (1-Услуги, 2-Одежда, ..., 5-Медицина, ..., 19-Энергетика)';
+                } else {
+                    qrDataLabel.textContent = 'Ссылка или текст:';
+                    qrDataInput.placeholder = 'Введите ссылку или текст для кодирования';
+                    qrDataInput.type = 'text';
+                    qrDataInput.removeAttribute('min');
+                    qrDataInput.removeAttribute('max');
+                    qrDataInput.removeAttribute('step');
+                    qrDataHelp.textContent = 'Введите URL-адрес или любой текст для кодирования в QR-код';
+                }
+            }
+            
+            qrTypeSelect.addEventListener('change', updateForm);
+            updateForm();
         });
     </script>
 </body>

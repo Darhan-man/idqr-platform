@@ -230,6 +230,55 @@
             opacity: 1;
         }
 
+        .auth-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--card-border);
+        }
+
+        .auth-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .auth-button.login {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .auth-button.register {
+            background: linear-gradient(135deg, var(--success), var(--accent));
+            color: white;
+        }
+
+        .auth-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .guest-notice {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
         .particles {
             position: fixed;
             top: 0;
@@ -280,6 +329,16 @@
             input:checked + .slider:before {
                 transform: translateX(22px);
             }
+            
+            .auth-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .auth-button {
+                width: 100%;
+                max-width: none;
+            }
         }
 
         @media (max-width: 480px) {
@@ -318,13 +377,13 @@
         <h2><i class="fas fa-bullseye"></i> Выберите модуль</h2>
 
         <div class="modules-grid">
-            <a href="/dashboard/services" class="module-button"><i class="fas fa-tools"></i> Услуги и быт</a>
+            <a href="/modules/services" class="module-button"><i class="fas fa-tools"></i> Услуги и быт</a>
             <a href="/modules/clothing" class="module-button"><i class="fas fa-tshirt"></i> Одежда и мода</a>
             <a href="/modules/transport" class="module-button"><i class="fas fa-car"></i> Транспорт и авто</a>
             <a href="/modules/education" class="module-button"><i class="fas fa-graduation-cap"></i> Образование и школы</a>
-            <a href="/dashboard/medicine" class="module-button"><i class="fas fa-heartbeat"></i> Медицина и здоровье</a>
+            <a href="/modules/medicine" class="module-button"><i class="fas fa-heartbeat"></i> Медицина и здоровье</a>
             <a href="/modules/construction" class="module-button"><i class="fas fa-hard-hat"></i> Стройка и объекты</a>
-            <a href="/dashboard/business" class="module-button"><i class="fas fa-building"></i> Бизнес и магазины</a>
+            <a href="/modules/business" class="module-button"><i class="fas fa-building"></i> Бизнес и магазины</a>
             <a href="/modules/logistics" class="module-button"><i class="fas fa-shipping-fast"></i> Склад и логистика</a>
             <a href="/modules/housing" class="module-button"><i class="fas fa-home"></i> ЖКХ и дома</a>
             <a href="/modules/events" class="module-button"><i class="fas fa-ticket-alt"></i> События и вход</a>
@@ -336,7 +395,20 @@
             <a href="/modules/gifts" class="module-button"><i class="fas fa-gift"></i> Подарки и сервис</a>
             <a href="/modules/branding" class="module-button"><i class="fas fa-tag"></i> Маркетинг и бренды</a>
             <a href="/modules/payment" class="module-button"><i class="fas fa-receipt"></i> Квитанции и оплата</a>
-            <a href="/dashboard/energy" class="module-button"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</a>
+            <a href="/modules/energy" class="module-button"><i class="fas fa-bolt"></i> Энергетика и инфраструктура</a>
+        </div>
+
+        <div class="auth-buttons">
+            <a href="/user/login" class="auth-button login">
+                <i class="fas fa-sign-in-alt"></i> Войти в аккаунт
+            </a>
+            <a href="/register" class="auth-button register">
+                <i class="fas fa-user-plus"></i> Зарегистрироваться
+            </a>
+        </div>
+
+        <div class="guest-notice">
+            <p><i class="fas fa-info-circle"></i> Вы используете гостевой доступ. Для полного доступа ко всем функциям рекомендуем войти или зарегистрироваться.</p>
         </div>
     </div>
 

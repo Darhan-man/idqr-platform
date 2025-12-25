@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDQR — Гостевой доступ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --primary-dark: #564FD8;
+            --secondary: #FF64B4;
+            --accent: #6DDFFF;
+            --light: #F8FAFF;
+            --dark: #1E1E2E;
+            --gray: #8B8B9F;
+            --success: #00C9A7;
+            --error: #FF6B93;
+            --warning: #FFA726;
+            --info: #64B5FF;
+            --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #1E1E2E;
+            --text-secondary: #8B8B9F;
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+            --border-radius: 16px;
+            --border-radius-sm: 12px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #817BFF;
+            --primary-dark: #6C63FF;
+            --secondary: #FF7AC6;
+            --accent: #81E6FF;
+            --light: #252536;
+            --dark: #F0F0F0;
+            --gray: #7B7B8F;
+            --success: #00D6B3;
+            --error: #FF7A9E;
+            --warning: #FFB74D;
+            --info: #74C1FF;
+            --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
+            --card-bg: rgba(30, 30, 46, 0.9);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #F0F0F0;
+            --text-secondary: #8B8B9F;
+            --input-bg: rgba(30, 30, 46, 0.7);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            color: var(--text-primary);
+        }
+
+        .guest-container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .guest-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            padding: 3rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .guest-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, var(--info), transparent);
+            opacity: 0.05;
+            transform: rotate(45deg);
+            z-index: 0;
+            animation: shimmer 8s ease infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: rotate(45deg) translateX(-50%); }
+            100% { transform: rotate(45deg) translateX(50%); }
+        }
+
+        .guest-card > * { position: relative; z-index: 1; }
+
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .module-name {
+            color: var(--info);
+            font-weight: 600;
+            background: rgba(100, 181, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 2rem;
+            display: inline-block;
+        }
+
+        .guest-features {
+            text-align: left;
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: rgba(100, 181, 255, 0.1);
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--info);
+        }
+
+        .guest-features h3 {
+            color: var(--info);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .guest-features ul {
+            list-style: none;
+            padding-left: 1rem;
+        }
+
+        .guest-features li {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .guest-features li i {
+            color: var(--info);
+        }
+
+        .guest-limit {
+            color: var(--warning);
+            background: rgba(255, 167, 38, 0.1);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--warning);
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+
+        .guest-limit i {
+            color: var(--warning);
+            margin-right: 0.5rem;
+        }
+
+        .guest-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius-sm);
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--info), #81E6FF);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--info);
+            color: var(--info);
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        @media (max-width: 768px) {
+            .guest-card { padding: 2.5rem 2rem; }
+            .guest-actions { flex-direction: column; }
+            h2 { font-size: 1.6rem; }
+        }
+
+        @media (max-width: 480px) {
+            .guest-card { padding: 2rem 1.5rem; }
+            h2 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="guest-container">
+        <div class="guest-card">
+            <h2><i class="fas fa-user-tie"></i> Гостевой доступ</h2>
+            
+            <div class="module-name">
+                <i class="fas fa-puzzle-piece"></i> {{ module_name }}
+            </div>
+            
+            <p>Вы используете гостевой доступ к модулю. Ограничения:</p>
+            
+            <div class="guest-features">
+                <h3><i class="fas fa-check-circle"></i> Доступно в гостевом режиме:</h3>
+                <ul>
+                    <li><i class="fas fa-eye"></i> Просмотр информации модуля</li>
+                    <li><i class="fas fa-info-circle"></i> Основные функции модуля</li>
+                    <li><i class="fas fa-search"></i> Поиск по содержимому</li>
+                </ul>
+            </div>
+            
+            <div class="guest-limit">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Недоступно в гостевом режиме:</strong>
+                <ul style="margin-top: 0.5rem;">
+                    <li>Создание QR-кодов</li>
+                    <li>Сохранение данных</li>
+                    <li>Расширенные функции</li>
+                    <li>Персонализация</li>
+                </ul>
+            </div>
+            
+            <div class="guest-actions">
+                <a href="{{ module_url }}" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Перейти в модуль
+                </a>
+                
+                <a href="/register?module={{ module_id }}" class="btn btn-secondary">
+                    <i class="fas fa-user-plus"></i> Зарегистрироваться
+                </a>
+            </div>
+            
+            <p style="margin-top: 2rem; color: var(--text-secondary); font-size: 0.9rem;">
+                <i class="fas fa-lightbulb"></i> Регистрация займет всего 1 минуту и откроет полный доступ!
+            </p>
+        </div>
+    </div>
+</body>
+</html>

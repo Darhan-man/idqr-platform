@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDQR — Регистрация</title>
+    <title>IDQR — Доступ к модулю</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -16,6 +16,8 @@
             --gray: #8B8B9F;
             --success: #00C9A7;
             --error: #FF6B93;
+            --warning: #FFA726;
+            --info: #64B5FF;
             --bg-gradient: linear-gradient(135deg, #F5F7FF 0%, #F0F4FF 50%, #E6ECFF 100%);
             --card-bg: rgba(255, 255, 255, 0.9);
             --card-border: rgba(255, 255, 255, 0.2);
@@ -39,6 +41,8 @@
             --gray: #7B7B8F;
             --success: #00D6B3;
             --error: #FF7A9E;
+            --warning: #FFB74D;
+            --info: #74C1FF;
             --bg-gradient: linear-gradient(135deg, #1E1E2E 0%, #2D2D44 50%, #252536 100%);
             --card-bg: rgba(30, 30, 46, 0.9);
             --card-border: rgba(255, 255, 255, 0.1);
@@ -67,30 +71,12 @@
             color: var(--text-primary);
         }
 
-        .register-container {
+        .access-container {
             width: 100%;
-            max-width: 480px;
-            position: relative;
+            max-width: 500px;
         }
 
-        .back-button {
-            position: absolute;
-            top: -60px;
-            left: 0;
-            color: var(--text-secondary);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 500;
-            transition: var(--transition);
-        }
-
-        .back-button:hover {
-            color: var(--primary);
-        }
-
-        .register-box {
+        .access-card {
             background: var(--card-bg);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
@@ -104,14 +90,14 @@
             overflow: hidden;
         }
 
-        .register-box::before {
+        .access-card::before {
             content: '';
             position: absolute;
             top: -50%;
             left: -50%;
             width: 200%;
             height: 200%;
-            background: linear-gradient(45deg, transparent, var(--success), transparent);
+            background: linear-gradient(45deg, transparent, var(--primary), transparent);
             opacity: 0.05;
             transform: rotate(45deg);
             z-index: 0;
@@ -123,11 +109,16 @@
             100% { transform: rotate(45deg) translateX(50%); }
         }
 
-        .register-box > * { position: relative; z-index: 1; }
+        .access-card > * { position: relative; z-index: 1; }
+
+        .access-card:hover {
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
+        }
 
         h2 {
             color: var(--text-primary);
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             font-size: 1.8rem;
             font-weight: 700;
             display: flex;
@@ -136,117 +127,83 @@
             gap: 0.75rem;
         }
 
-        .logo {
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--success), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .module-name {
+            color: var(--primary);
+            font-weight: 600;
+            background: rgba(108, 99, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 2rem;
+            display: inline-block;
         }
 
-        form {
+        .access-options {
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
+            margin-top: 2rem;
         }
 
-        .input-group {
-            position: relative;
-        }
-
-        input {
-            padding: 1.2rem 1.5rem;
-            border: 1px solid var(--card-border);
-            border-radius: var(--border-radius-sm);
-            font-size: 1rem;
-            transition: var(--transition);
-            width: 100%;
-            background: var(--input-bg);
-            color: var(--text-primary);
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--success);
-            box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.15);
-        }
-
-        input::placeholder { color: var(--text-secondary); }
-
-        .checkbox-group {
-            text-align: left;
-            margin-top: 1rem;
-            padding: 1rem;
-            background: rgba(0, 201, 167, 0.1);
-            border-radius: var(--border-radius-sm);
-            border-left: 4px solid var(--success);
-        }
-
-        .checkbox-label {
+        .access-button {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            margin-bottom: 0.5rem;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1.2rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
         }
 
-        .checkbox-label input[type="checkbox"] {
-            width: auto;
-            transform: scale(1.2);
+        .access-button.guest {
+            background: linear-gradient(135deg, var(--info), #81E6FF);
+            color: white;
         }
 
-        .checkbox-help {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 0.5rem;
-        }
-
-        button {
+        .access-button.register {
             background: linear-gradient(135deg, var(--success), var(--accent));
             color: white;
-            border: none;
-            padding: 1.2rem 2rem;
-            border-radius: var(--border-radius-sm);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
+        }
+
+        .access-button.login {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .access-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .access-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
             transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
         }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 201, 167, 0.3);
+        .access-button:hover::before {
+            left: 100%;
         }
 
-        .error {
-            color: var(--error);
-            margin-top: 1rem;
-            padding: 1rem;
-            background: rgba(255, 107, 147, 0.1);
-            border-radius: var(--border-radius-sm);
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
+        .icon {
+            font-size: 1.5rem;
         }
 
-        .login-link {
+        .info-text {
+            color: var(--text-secondary);
             margin-top: 1.5rem;
-            text-align: center;
-        }
-
-        .login-link a {
-            color: var(--primary);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            font-weight: 500;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
 
         .particles {
@@ -262,7 +219,7 @@
         .particle {
             position: absolute;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--success), var(--accent));
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             opacity: 0.1;
             animation: float 15s infinite linear;
         }
@@ -273,62 +230,51 @@
         }
 
         @media (max-width: 768px) {
-            .register-box { padding: 2.5rem 2rem; }
+            .access-card { padding: 2.5rem 2rem; }
             h2 { font-size: 1.6rem; }
+            .access-button { padding: 1rem; }
         }
 
         @media (max-width: 480px) {
-            .register-box { padding: 2rem 1.5rem; }
+            .access-card { padding: 2rem 1.5rem; }
             h2 { font-size: 1.4rem; }
-            .back-button { top: -50px; }
+            .access-options { gap: 1rem; }
         }
     </style>
 </head>
 <body>
     <div class="particles" id="particles"></div>
     
-    <div class="register-container">
-        <a href="/" class="back-button">
-            <i class="fas fa-arrow-left"></i> Назад на главную
-        </a>
-        
-        <div class="register-box">
-            <h2><span class="logo"><i class="fas fa-user-plus"></i></span> Регистрация</h2>
-
-            {% if error %}
-                <div class="error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
-            {% endif %}
-
-            <form method="post" action="/register">
-                <div class="input-group">
-                    <input type="text" name="username" placeholder="Имя пользователя" required>
-                </div>
-                
-                <div class="input-group">
-                    <input type="password" name="password" placeholder="Пароль" required>
-                </div>
-                
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="is_medical_worker" id="is_medical_worker">
-                        <span>Я медицинский работник</span>
-                    </label>
-                    <div class="checkbox-help">
-                        Отметьте, если вы работаете в медицинской сфере. Это даст доступ к специальным медицинским модулям и функциям.
-                    </div>
-                </div>
-
-                {% if module %}
-                <input type="hidden" name="module" value="{{ module }}">
-                {% endif %}
-                
-                <button type="submit"><i class="fas fa-user-plus"></i> Зарегистрироваться</button>
-            </form>
-
-            <div class="login-link">
-                <a href="/user/login{% if module %}?module={{ module }}{% endif %}">
-                    <i class="fas fa-sign-in-alt"></i> Уже есть аккаунт? Войти
+    <div class="access-container">
+        <div class="access-card">
+            <h2><i class="fas fa-door-open"></i> Выберите способ доступа</h2>
+            
+            <div class="module-name">
+                <i class="fas fa-puzzle-piece"></i> {{ module_name }}
+            </div>
+            
+            <p>Чтобы получить доступ к этому модулю, выберите один из вариантов:</p>
+            
+            <div class="access-options">
+                <a href="/module/{{ module_id }}/guest" class="access-button guest">
+                    <i class="fas fa-user icon"></i>
+                    <span>Продолжить как гость</span>
                 </a>
+                
+                <a href="/register?module={{ module_id }}" class="access-button register">
+                    <i class="fas fa-user-plus icon"></i>
+                    <span>Зарегистрироваться</span>
+                </a>
+                
+                <a href="/user/login?module={{ module_id }}" class="access-button login">
+                    <i class="fas fa-sign-in-alt icon"></i>
+                    <span>Войти в аккаунт</span>
+                </a>
+            </div>
+            
+            <div class="info-text">
+                <p><strong>Гостевой доступ:</strong> позволяет просматривать модуль с ограниченными функциями.</p>
+                <p><strong>Регистрация:</strong> дает полный доступ ко всем функциям модуля и системы.</p>
             </div>
         </div>
     </div>
@@ -336,13 +282,13 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const particlesContainer = document.getElementById('particles');
-            const particleCount = 20;
+            const particleCount = 15;
             
             for (let i = 0; i < particleCount; i++) {
                 const particle = document.createElement('div');
                 particle.classList.add('particle');
                 
-                const size = Math.random() * 50 + 10;
+                const size = Math.random() * 40 + 10;
                 particle.style.width = `${size}px`;
                 particle.style.height = `${size}px`;
                 
