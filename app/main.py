@@ -1025,406 +1025,181 @@ async def user_modules(request: Request):
         "active": "modules"
     })
 
-# --- ИСПРАВЛЕННЫЕ МАРШРУТЫ ДЛЯ НАВИГАЦИИ ---
+# --- ДОБАВЛЕННЫЕ МАРШРУТЫ (добавь в самый конец файла, перед if __name__ == "__main__") ---
 
-# Основная страница с QR-кодами (уже есть)
-@app.get("/dashboard/qr", response_class=HTMLResponse)
-async def dashboard_qr(request: Request):
-    user = await check_ip_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            if user[3] == "admin":
-                cursor = await db.execute("SELECT * FROM qr_codes ORDER BY id DESC")
-            else:
-                cursor = await db.execute("SELECT * FROM qr_codes WHERE user_id = ? ORDER BY id DESC", (user[0],))
-            qr_list = await cursor.fetchall()
-        
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": qr_list,
-            "active": "qr",
-            "user": user
-        })
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке QR-кодов: {e}")
-        return templates.TemplateResponse("qr.html", {
-            "request": request,
-            "qr_list": [],
-            "active": "qr",
-            "user": user,
-            "error": "Ошибка при загрузке данных"
-        })
+@app.get("/account_frozen.html", response_class=HTMLResponse)
+async def account_frozen_html(request: Request):
+    return templates.TemplateResponse("account_frozen.html", {"request": request})
 
-# МАРШРУТЫ ДЛЯ ПАНЕЛИ АДМИНИСТРАТОРА (dashboard)
-@app.get("/dashboard/energy_meters", response_class=HTMLResponse)
-async def dashboard_energy_meters(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_meters.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
+@app.get("/ip_blocked.html", response_class=HTMLResponse)
+async def ip_blocked_html(request: Request):
+    return templates.TemplateResponse("ip_blocked.html", {"request": request})
 
-@app.get("/dashboard/energy_renewable", response_class=HTMLResponse)
-async def dashboard_energy_renewable(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_renewable.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_suppliers", response_class=HTMLResponse)
-async def dashboard_energy_suppliers(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_suppliers.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy", response_class=HTMLResponse)
-async def dashboard_energy(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/ip_management", response_class=HTMLResponse)
-async def dashboard_ip_management(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("ip_management.html", {
-        "request": request,
-        "user": user,
-        "active": "ip"
-    })
-
-@app.get("/dashboard/medicine", response_class=HTMLResponse)
-async def dashboard_medicine(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("medicine.html", {
-        "request": request,
-        "user": user,
-        "active": "medicine"
-    })
-
-@app.get("/dashboard/services", response_class=HTMLResponse)
-async def dashboard_services(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("services.html", {
-        "request": request,
-        "user": user,
-        "active": "services"
-    })
-
-@app.get("/dashboard/settings", response_class=HTMLResponse)
-async def dashboard_settings(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("settings.html", {
-        "request": request,
-        "user": user,
-        "active": "settings"
-    })
-
-@app.get("/dashboard/stats", response_class=HTMLResponse)
-async def dashboard_stats(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("stats.html", {
-        "request": request,
-        "user": user,
-        "active": "stats"
-    })
-
-@app.get("/dashboard/business", response_class=HTMLResponse)
-async def dashboard_business(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("business.html", {
-        "request": request,
-        "user": user,
-        "active": "business"
-    })
-
-@app.get("/dashboard/cleaning", response_class=HTMLResponse)
-async def dashboard_cleaning(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("cleaning.html", {
-        "request": request,
-        "user": user,
-        "active": "cleaning"
-    })
-
-@app.get("/dashboard/complaint_form", response_class=HTMLResponse)
-async def dashboard_complaint_form(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("complaint_form.html", {
-        "request": request,
-        "user": user,
-        "active": "complaints"
-    })
-
-@app.get("/dashboard/complaint_status", response_class=HTMLResponse)
-async def dashboard_complaint_status(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("complaint_status.html", {
-        "request": request,
-        "user": user,
-        "active": "complaints"
-    })
-
-@app.get("/dashboard/complaint_success", response_class=HTMLResponse)
-async def dashboard_complaint_success(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("complaint_success.html", {
-        "request": request,
-        "user": user,
-        "active": "complaints"
-    })
-
-@app.get("/dashboard/energy_analytics", response_class=HTMLResponse)
-async def dashboard_energy_analytics(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_analytics.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_complaints", response_class=HTMLResponse)
-async def dashboard_energy_complaints(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_complaints.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_documents", response_class=HTMLResponse)
-async def dashboard_energy_documents(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_documents.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_electricity", response_class=HTMLResponse)
-async def dashboard_energy_electricity(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_electricity.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_heat_gas", response_class=HTMLResponse)
-async def dashboard_energy_heat_gas(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_heat_gas.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/energy_inspections", response_class=HTMLResponse)
-async def dashboard_energy_inspections(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("energy_inspections.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/dashboard/system_logs", response_class=HTMLResponse)
-async def dashboard_system_logs(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("system_logs.html", {
-        "request": request,
-        "user": user,
-        "active": "system"
-    })
-
-@app.get("/dashboard/system_settings", response_class=HTMLResponse)
-async def dashboard_system_settings(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("system_settings.html", {
-        "request": request,
-        "user": user,
-        "active": "system"
-    })
-
-@app.get("/dashboard/users", response_class=HTMLResponse)
-async def dashboard_users(request: Request):
-    user = await check_admin(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("users.html", {
-        "request": request,
-        "user": user,
-        "active": "users"
-    })
-
-# МАРШРУТЫ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ (user)
-@app.get("/user/dashboard", response_class=HTMLResponse)
-async def user_dashboard_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_dashboard.html", {
-        "request": request,
-        "user": user,
-        "active": "dashboard"
-    })
-
-@app.get("/user/energy", response_class=HTMLResponse)
-async def user_energy_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_energy.html", {
-        "request": request,
-        "user": user,
-        "active": "energy"
-    })
-
-@app.get("/user/medicine", response_class=HTMLResponse)
-async def user_medicine_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_medicine.html", {
-        "request": request,
-        "user": user,
-        "active": "medicine"
-    })
-
-@app.get("/user/modules", response_class=HTMLResponse)
-async def user_modules_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_modules.html", {
-        "request": request,
-        "user": user,
-        "active": "modules"
-    })
-
-@app.get("/user/settings", response_class=HTMLResponse)
-async def user_settings_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_settings.html", {
-        "request": request,
-        "user": user,
-        "active": "settings"
-    })
-
-@app.get("/user/contact", response_class=HTMLResponse)
-async def user_contact_page(request: Request):
-    user = await check_user_access(request)
-    if isinstance(user, RedirectResponse) or isinstance(user, dict):
-        return user
-    return templates.TemplateResponse("user_contact.html", {
-        "request": request,
-        "user": user,
-        "active": "contact"
-    })
-
-# ОСНОВНЫЕ СТРАНИЦЫ ДОСТУПА
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    module = request.query_params.get("module")
-    return templates.TemplateResponse("register.html", {
-        "request": request,
-        "module": module
-    })
-
-@app.get("/modules", response_class=HTMLResponse)
-async def modules_page(request: Request):
+@app.get("/modules.html", response_class=HTMLResponse)
+async def modules_html(request: Request):
     return templates.TemplateResponse("modules.html", {"request": request})
 
-@app.get("/module/{module_id}/guest", response_class=HTMLResponse)
-async def guest_module_page(request: Request, module_id: int):
+@app.get("/error.html", response_class=HTMLResponse)
+async def error_html(request: Request):
+    return templates.TemplateResponse("error.html", {"request": request})
+
+@app.get("/guest_module.html", response_class=HTMLResponse)
+async def guest_module_html(request: Request):
+    module_id = request.query_params.get("module_id", 1)
     return templates.TemplateResponse("guest_module.html", {
         "request": request,
         "module_id": module_id
     })
 
-@app.get("/scan/{qr_id}/access", response_class=HTMLResponse)
-async def module_access_page(request: Request, qr_id: int):
+@app.get("/module_access.html", response_class=HTMLResponse)
+async def module_access_html(request: Request):
+    qr_id = request.query_params.get("qr_id", 1)
     return templates.TemplateResponse("module_access.html", {
         "request": request,
         "qr_id": qr_id
     })
 
-@app.get("/error", response_class=HTMLResponse)
-async def error_page(request: Request):
-    error = request.query_params.get("error", "Произошла ошибка")
-    return templates.TemplateResponse("error.html", {
-        "request": request,
-        "error": error
-    })
+@app.get("/register.html", response_class=HTMLResponse)
+async def register_html(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
 
-@app.get("/account_frozen", response_class=HTMLResponse)
-async def account_frozen_page(request: Request):
-    return templates.TemplateResponse("account_frozen.html", {"request": request})
+@app.get("/login.html", response_class=HTMLResponse)
+async def login_html(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
-@app.get("/ip_blocked", response_class=HTMLResponse)
-async def ip_blocked_page(request: Request):
-    return templates.TemplateResponse("ip_blocked.html", {"request": request})
+@app.get("/qr.html", response_class=HTMLResponse)
+async def qr_html(request: Request):
+    return templates.TemplateResponse("qr.html", {"request": request})
+
+# --- ВСЕ ОСТАЛЬНЫЕ ФАЙЛЫ ИЗ СКРИНОВ ---
+
+@app.get("/energy_meters.html", response_class=HTMLResponse)
+async def energy_meters_html(request: Request):
+    return templates.TemplateResponse("energy_meters.html", {"request": request})
+
+@app.get("/energy_renewable.html", response_class=HTMLResponse)
+async def energy_renewable_html(request: Request):
+    return templates.TemplateResponse("energy_renewable.html", {"request": request})
+
+@app.get("/energy_suppliers.html", response_class=HTMLResponse)
+async def energy_suppliers_html(request: Request):
+    return templates.TemplateResponse("energy_suppliers.html", {"request": request})
+
+@app.get("/energy.html", response_class=HTMLResponse)
+async def energy_html(request: Request):
+    return templates.TemplateResponse("energy.html", {"request": request})
+
+@app.get("/index.html", response_class=HTMLResponse)
+async def index_html(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/ip_management.html", response_class=HTMLResponse)
+async def ip_management_html(request: Request):
+    return templates.TemplateResponse("ip_management.html", {"request": request})
+
+@app.get("/medicine.html", response_class=HTMLResponse)
+async def medicine_html(request: Request):
+    return templates.TemplateResponse("medicine.html", {"request": request})
+
+@app.get("/services.html", response_class=HTMLResponse)
+async def services_html(request: Request):
+    return templates.TemplateResponse("services.html", {"request": request})
+
+@app.get("/settings.html", response_class=HTMLResponse)
+async def settings_html(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request})
+
+@app.get("/stats.html", response_class=HTMLResponse)
+async def stats_html(request: Request):
+    return templates.TemplateResponse("stats.html", {"request": request})
+
+@app.get("/business.html", response_class=HTMLResponse)
+async def business_html(request: Request):
+    return templates.TemplateResponse("business.html", {"request": request})
+
+@app.get("/cleaning.html", response_class=HTMLResponse)
+async def cleaning_html(request: Request):
+    return templates.TemplateResponse("cleaning.html", {"request": request})
+
+@app.get("/complaint_form.html", response_class=HTMLResponse)
+async def complaint_form_html(request: Request):
+    return templates.TemplateResponse("complaint_form.html", {"request": request})
+
+@app.get("/complaint_status.html", response_class=HTMLResponse)
+async def complaint_status_html(request: Request):
+    return templates.TemplateResponse("complaint_status.html", {"request": request})
+
+@app.get("/complaint_success.html", response_class=HTMLResponse)
+async def complaint_success_html(request: Request):
+    return templates.TemplateResponse("complaint_success.html", {"request": request})
+
+@app.get("/edit_qr.html", response_class=HTMLResponse)
+async def edit_qr_html(request: Request):
+    return templates.TemplateResponse("edit_qr.html", {"request": request})
+
+@app.get("/energy_analytics.html", response_class=HTMLResponse)
+async def energy_analytics_html(request: Request):
+    return templates.TemplateResponse("energy_analytics.html", {"request": request})
+
+@app.get("/energy_complaints.html", response_class=HTMLResponse)
+async def energy_complaints_html(request: Request):
+    return templates.TemplateResponse("energy_complaints.html", {"request": request})
+
+@app.get("/energy_documents.html", response_class=HTMLResponse)
+async def energy_documents_html(request: Request):
+    return templates.TemplateResponse("energy_documents.html", {"request": request})
+
+@app.get("/energy_electricity.html", response_class=HTMLResponse)
+async def energy_electricity_html(request: Request):
+    return templates.TemplateResponse("energy_electricity.html", {"request": request})
+
+@app.get("/energy_heat_gas.html", response_class=HTMLResponse)
+async def energy_heat_gas_html(request: Request):
+    return templates.TemplateResponse("energy_heat_gas.html", {"request": request})
+
+@app.get("/energy_inspections.html", response_class=HTMLResponse)
+async def energy_inspections_html(request: Request):
+    return templates.TemplateResponse("energy_inspections.html", {"request": request})
+
+@app.get("/system_logs.html", response_class=HTMLResponse)
+async def system_logs_html(request: Request):
+    return templates.TemplateResponse("system_logs.html", {"request": request})
+
+@app.get("/system_settings.html", response_class=HTMLResponse)
+async def system_settings_html(request: Request):
+    return templates.TemplateResponse("system_settings.html", {"request": request})
+
+@app.get("/user_contact.html", response_class=HTMLResponse)
+async def user_contact_html(request: Request):
+    return templates.TemplateResponse("user_contact.html", {"request": request})
+
+@app.get("/user_dashboard-1.html", response_class=HTMLResponse)
+async def user_dashboard_1_html(request: Request):
+    return templates.TemplateResponse("user_dashboard-1.html", {"request": request})
+
+@app.get("/user_dashboard.html", response_class=HTMLResponse)
+async def user_dashboard_html(request: Request):
+    return templates.TemplateResponse("user_dashboard.html", {"request": request})
+
+@app.get("/user_energy.html", response_class=HTMLResponse)
+async def user_energy_html(request: Request):
+    return templates.TemplateResponse("user_energy.html", {"request": request})
+
+@app.get("/user_medicine.html", response_class=HTMLResponse)
+async def user_medicine_html(request: Request):
+    return templates.TemplateResponse("user_medicine.html", {"request": request})
+
+@app.get("/user_modules.html", response_class=HTMLResponse)
+async def user_modules_html(request: Request):
+    return templates.TemplateResponse("user_modules.html", {"request": request})
+
+@app.get("/user_settings.html", response_class=HTMLResponse)
+async def user_settings_html(request: Request):
+    return templates.TemplateResponse("user_settings.html", {"request": request})
+
+@app.get("/users.html", response_class=HTMLResponse)
+async def users_html(request: Request):
+    return templates.TemplateResponse("users.html", {"request": request})
 
 # --- СТРАНИЦЫ ОШИБОК ---
 @app.get("/user/blocked", response_class=HTMLResponse)
